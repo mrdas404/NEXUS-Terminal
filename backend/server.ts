@@ -32,7 +32,8 @@ app.use(express.json({ limit: '10mb' }));
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 const marketDataFeed = new MarketDataFeedService();
-const historicalCandles = new HistoricalCandleService();
+const researchStore = new ResearchStore(process.env.RESEARCH_DB_PATH);
+const historicalCandles = new HistoricalCandleService(researchStore);
 
 let currentSignals: any[] = [];
 const clients: Set<WebSocket> = new Set();
@@ -118,6 +119,20 @@ app.get('/api/market/candles', async (req, res) => {
   } catch (error) { apiError(res, error); }
 });
 
+app.get('/api/market/candles/archive', (req, res) => {
+  try {
+    const symbol = typeof req.query.symbol === 'string' ? req.query.symbol : '';
+    const marketType = req.query.marketType;
+    const source = req.query.source;
+    if (marketType !== 'LIVE' || source !== 'PROVIDER_API') throw new Error('Archive chart query is restricted to LIVE / PROVIDER_API data');
+    const startTime = req.query.startTime === undefined ? undefined : Number(req.query.startTime);
+    const endTime = req.query.endTime === undefined ? undefined : Number(req.query.endTime);
+    if ((startTime !== undefined && !Number.isFinite(startTime)) || (endTime !== undefined && !Number.isFinite(endTime)) || (startTime !== undefined && endTime !== undefined && startTime > endTime)) throw new Error('Invalid archive time range');
+    const candles = researchStore.getCandles({ symbol, marketType: 'LIVE', source: 'PROVIDER_API', startTime, endTime });
+    res.json({ symbol, marketType: 'LIVE', source: 'PROVIDER_API', timeframe: '1m', candles, count: candles.length, persistent: true });
+  } catch (error) { apiError(res, error); }
+});
+
 app.get('/api/market/feeds', (_req, res) => {
   res.json({
     feeds: [marketDataFeed.getStatus()],
@@ -141,7 +156,6 @@ app.get('/api/sentiment', (req, res) => {
 
 
 // ── Research / Backtest / Paper Trading API (virtual only) ──────
-const researchStore = new ResearchStore(process.env.RESEARCH_DB_PATH);
 const historicalResearch = new HistoricalResearchService(researchStore);
 const paperSessions = new Map<string, PersistentPaperTradingService>();
 const validMarket = (v: unknown): v is QuotexMarketType => v === 'LIVE' || v === 'OTC';
