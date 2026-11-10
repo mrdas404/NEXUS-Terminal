@@ -35,7 +35,7 @@ test('production server smoke: health, readiness, MessagePack WebSocket and grac
   const port=await freePort();
   const child=spawn(process.execPath,[path.resolve(__dirname,'../server.js')],{
     cwd:path.resolve(__dirname,'../..'),
-    env:{...process.env,PORT:String(port),CORE_DB_PATH:path.join(directory,'core.db'),RESEARCH_DB_PATH:path.join(directory,'research.db'),CORS_ORIGINS:'http://localhost:5173'},
+    env:{...process.env,PORT:String(port),CORE_DB_PATH:path.join(directory,'core.db'),RESEARCH_DB_PATH:path.join(directory,'research.db'),CORS_ORIGINS:'http://localhost:5173',ADMIN_PASSWORD:'test-admin-password-that-is-long-enough',SESSION_SECRET:'test-session-secret-that-is-at-least-32-characters-long'},
     stdio:['ignore','pipe','pipe']
   });
   let socket:WebSocket|undefined;
@@ -51,7 +51,20 @@ test('production server smoke: health, readiness, MessagePack WebSocket and grac
     assert.equal(ready.status,200);
     assert.equal((await ready.json() as {ready:boolean}).ready,true);
 
-    socket=new WebSocket('ws://127.0.0.1:'+port+'/ws');
+    const unauthenticated=await fetch('http://127.0.0.1:'+port+'/api/settings');
+    assert.equal(unauthenticated.status,401);
+    const login=await fetch('http://127.0.0.1:'+port+'/api/auth/login',{
+      method:'POST',headers:{'Content-Type':'application/json','Origin':'http://localhost:5173'},
+      body:JSON.stringify({password:'test-admin-password-that-is-long-enough'})
+    });
+    assert.equal(login.status,200);
+    const cookie=login.headers.get('set-cookie');
+    assert.ok(cookie?.includes('HttpOnly'));
+    assert.ok(cookie?.includes('SameSite=Strict'));
+    const authorized=await fetch('http://127.0.0.1:'+port+'/api/settings',{headers:{cookie:cookie!.split(';')[0]}});
+    assert.equal(authorized.status,200);
+
+    socket=new WebSocket('ws://127.0.0.1:'+port+'/ws',{headers:{cookie:cookie!.split(';')[0],origin:'http://localhost:5173'}});
     const [data]=await once(socket,'message') as [Buffer];
     const initial=unpack(data) as {type:string;data:{marketFeed:{marketType:string;source:string}}};
     assert.equal(initial.type,'INIT_STATE');
