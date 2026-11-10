@@ -49,7 +49,7 @@ export interface TerminalState {
   marketGaps: MarketCandleGap[];
 }
 
-const WS_URL = (import.meta.env.VITE_WS_URL || 'ws://localhost:3001').replace(/^http/,'ws');
+const WS_URL = (import.meta.env.VITE_WS_URL || window.location.protocol.replace('http','ws') + '//' + window.location.host).replace(/^http/,'ws');
 const INITIAL_PRICES: Record<Asset, Record<ExchangeName, number | null>> = {
   'BTC/USDT': { Binance: null, Coinbase: null, Uniswap: null },
   'ETH/USDT': { Binance: null, Coinbase: null, Uniswap: null },
@@ -59,7 +59,7 @@ const INITIAL_HISTORY: Record<Asset, { time: number; price: number }[]> = {
   'BTC/USDT': [], 'ETH/USDT': [], 'SOL/USDT': [],
 };
 const MAX_HISTORY_POINTS = 60;
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3001').replace(/\/$/, '');
+const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
 export function useTerminalWebSocket() {
   const [state, setState] = useState<TerminalState>({
