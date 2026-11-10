@@ -25,6 +25,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate Compose configuration
+        env:
+          ADMIN_PASSWORD: ci-only-admin-password-not-used-for-deployment
+          SESSION_SECRET: ci-only-session-secret-value-long-enough-for-validation
         run: docker compose config --quiet
       - name: Build backend production image
         run: docker build -f backend/Dockerfile backend
