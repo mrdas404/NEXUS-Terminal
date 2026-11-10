@@ -21,7 +21,7 @@ test('admin session is signed, expires after eight hours and rejects tampering',
 });
 
 test('cookie parsing handles multiple cookies and malformed values', () => {
-  const token = createAdminSession(secret, now);
+  const token = createAdminSession(secret);
   const header = 'theme=dark; nexus_admin_session=' + encodeURIComponent(token) + '; other=value';
   assert.equal(readCookie(header, 'nexus_admin_session'), token);
   assert.equal(isAdminSessionValid(header, secret), true);
