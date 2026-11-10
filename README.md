@@ -251,3 +251,10 @@ The backend can connect to Binance's public Spot trade WebSocket for BTC/USDT, E
 - Reconnect uses capped exponential backoff; a feed with no message for 15 seconds is reported as `STALE`.
 - Binance Spot data is not Quotex OTC data. OTC remains unavailable until a legitimate, authorized OTC data provider is configured. Do not relabel this crypto feed as Quotex pricing.
 - The existing frontend terminal socket receives feed events; paper sessions are not automatically traded from live data. Explicit session selection and virtual-only controls remain required.
+
+
+## Phase 5.2 — Frontend market feed monitor
+
+The Market view now displays the public feed's connection state, provider, LIVE/PROVIDER_API provenance, last tick age, reconnect attempt and provider error. It shows the latest received BTC/USDT, ETH/USDT and SOL/USDT prices, and warns when the provider is stale, disconnected or the dashboard socket is offline.
+
+Configure `VITE_WS_URL` for the backend WebSocket when it is not at `ws://localhost:3001`. The Binance public spot stream is not Quotex OTC pricing. OTC is shown as unavailable rather than fabricated. Live feed ticks are informational only and are not automatically submitted to paper sessions or broker execution.
