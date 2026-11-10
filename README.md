@@ -305,7 +305,7 @@ The optional paper bridge is deliberately manual: the user must create/recover a
 - Core and research SQLite paths can be configured independently and parent directories are created before opening the database. Keep these paths on persistent writable storage in deployment.
 - Provider upsert now enforces the same canonical one-minute timestamp and OHLCV validation as strict imports.
 - Added readiness and provider-upsert integrity tests, plus a production smoke test that launches the compiled backend on an ephemeral port, checks `/health` and `/ready`, verifies the binary MessagePack WebSocket `INIT_STATE`, and confirms SIGTERM shutdown. Added `backend/.env.example`.
-- GitHub Actions Backend validation: **42 tests passed, 0 failed**, and TypeScript build passed, including the compiled-server smoke test. Frontend production build has a passing CI run from the current frontend code. CI validates backend tests and TypeScript build; frontend CI validates its production build. These checks are not a substitute for deployment-specific browser, reverse-proxy, TLS, real network and long-duration soak testing.
+- GitHub Actions Backend validation: **43 tests passed, 0 failed**, and TypeScript build passed, including the compiled-server smoke test. Frontend production build has a passing CI run from the current frontend code. CI validates backend tests and TypeScript build; frontend CI validates its production build. These checks are not a substitute for deployment-specific browser, reverse-proxy, TLS, real network and long-duration soak testing.
 - Binance public Spot remains LIVE crypto reference data only, not Quotex LIVE/OTC account data. The system remains read-only with virtual paper trading only.
 
 ### Production configuration
