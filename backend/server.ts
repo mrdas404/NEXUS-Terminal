@@ -90,7 +90,8 @@ wss.on('connection', (ws) => {
       prices: priceStore.getPrices(),
       signals: currentSignals,
       pnl: detectionEngine.totalPnl,
-      sentiment: sentimentEngine.getSentiment(),\n      marketFeed: marketDataFeed.getStatus(),
+      sentiment: sentimentEngine.getSentiment(),
+      marketFeed: marketDataFeed.getStatus(),
     }
   }));
 
