@@ -16,7 +16,7 @@ export function MarketFeedMonitor({status,ticks,connected}:Props){
  return <section className="rounded-lg border border-darkBorder bg-darkSurface p-4 space-y-3">
   <div className="flex flex-wrap items-center justify-between gap-2">
    <div className="flex items-center gap-2"><Activity size={17} className="text-neonGreen"/><h2 className="font-semibold">Market data feed</h2></div>
-   <span className={\`inline-flex items-center gap-1.5 rounded border px-2.5 py-1 text-xs \${tone}\`}><Icon size={13}/>{state}</span>
+   <span className={`inline-flex items-center gap-1.5 rounded border px-2.5 py-1 text-xs ${tone}`}><Icon size={13}/>{state}</span>
   </div>
   <div className="grid gap-2 sm:grid-cols-3 text-xs">
    <div className="rounded bg-[#0b0e14] p-3"><p className="text-gray-500">Provider</p><p className="mt-1 text-gray-200">{status.provider}</p></div>
