@@ -102,7 +102,14 @@ wss.on('connection', (ws) => {
 
 // ── REST API ───────────────────────────────────────────────────
 app.get('/health', (req, res) => {
-  res.json({ status: 'Terminal Backend Active', pnl: detectionEngine.totalPnl });
+  res.json({ status: 'Terminal Backend Active', pnl: detectionEngine.totalPnl, marketFeed: marketDataFeed.getStatus() });
+});
+
+app.get('/api/market/feeds', (_req, res) => {
+  res.json({
+    feeds: [marketDataFeed.getStatus()],
+    note: 'Binance public spot feed is LIVE crypto data; it is not a Quotex OTC quote feed.'
+  });
 });
 
 app.get('/api/settings', (req, res) => {
