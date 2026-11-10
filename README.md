@@ -375,3 +375,30 @@ The `Deployment validation` GitHub Actions workflow checks Compose syntax and bu
 ### Security audit status — deployment blocker
 
 The backend dependency audit on 2026-11-10 reported **9 advisories: 1 critical, 4 high and 4 moderate** (including transitive packages such as `proxy-addr`, `ws`, `body-parser` and `path-to-regexp`). npm reports available fixes, but they have not yet been applied to the lockfile or revalidated. Do not treat this branch as public-production-ready until dependency remediation is reviewed, committed, and the audit is rerun with no critical/high findings.
+
+
+## Phase 5.9 — Single-admin authentication and dependency security
+
+The terminal now uses one server-configured administrator password. Configure these values before starting the backend:
+
+- `ADMIN_PASSWORD`: unique password with at least 16 characters.
+- `SESSION_SECRET`: random secret with at least 32 characters. Generate one with `node -e "console.log(require('node:crypto').randomBytes(48).toString('base64url'))"`.
+- Copy root `.env.example` to `.env`, fill both values, and never commit the real `.env` file. The Compose deployment refuses to start without both values.
+
+Authentication behavior:
+- `POST /api/auth/login` creates a signed, eight-hour administrator session.
+- Session cookie is HttpOnly, SameSite=Strict, scoped to the site, and Secure when the request is HTTPS.
+- `POST /api/auth/logout` clears the cookie; `GET /api/auth/session` reports session state.
+- All other `/api/*` routes require a valid session. The `/health` and `/ready` probes remain unauthenticated for container health checks.
+- WebSocket `/ws` requires the same session cookie and an allowed browser origin.
+- Login attempts are limited to five failures per source IP per 15-minute window. Mutating API requests and login/logout validate the Origin header when supplied.
+- Missing or weak server credentials cause startup to fail closed. Do not set wildcard CORS origins. Always deploy behind HTTPS/TLS; an HTTP local development session will not receive the Secure cookie flag.
+
+The frontend shows an administrator sign-in screen before opening the terminal WebSocket. Use a same-origin reverse proxy so browser API, cookie and WebSocket requests share the same host.
+
+Dependency security:
+- `.github/workflows/dependency-security-audit.yml` runs `npm ci` and `npm audit --json` separately for backend and frontend lockfiles.
+- It reports direct/transitive advisory data and blocks critical/high findings. Moderate/low findings remain visible in the audit output.
+- A successful image build or unit-test workflow is not a clean dependency audit. Public deployment remains blocked until the current branch head has a fresh successful audit, all critical/high findings are resolved, and deployment has been reviewed.
+
+This is a single-admin gate, not multi-user identity management. It does not add account recovery, MFA, password rotation, persistent session revocation, or distributed rate limiting. Keep the service behind a private network or identity-aware ingress until those controls and production restore/monitoring checks are complete. No real-money trade execution is enabled.
