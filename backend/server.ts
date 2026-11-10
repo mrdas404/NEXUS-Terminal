@@ -18,6 +18,7 @@ import { HistoricalResearchService } from './src/services/HistoricalResearchServ
 import { PersistentPaperTradingService } from './src/services/PersistentPaperTradingService';
 import { PaperTradingEngine, type PaperTradingOptions } from './src/services/PaperTradingEngine';
 import { MarketDataFeedService } from './src/services/MarketDataFeedService';
+import { HistoricalCandleService } from './src/services/HistoricalCandleService';
 
 // Initialize exchanges
 import './src/exchanges/Binance';
@@ -31,6 +32,7 @@ app.use(express.json({ limit: '10mb' }));
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 const marketDataFeed = new MarketDataFeedService();
+const historicalCandles = new HistoricalCandleService();
 
 let currentSignals: any[] = [];
 const clients: Set<WebSocket> = new Set();
@@ -104,6 +106,16 @@ wss.on('connection', (ws) => {
 // ── REST API ───────────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.json({ status: 'Terminal Backend Active', pnl: detectionEngine.totalPnl, marketFeed: marketDataFeed.getStatus() });
+});
+
+app.get('/api/market/candles', async (req, res) => {
+  try {
+    const symbol = typeof req.query.symbol === 'string' ? req.query.symbol : '';
+    const limit = req.query.limit === undefined ? 300 : Number(req.query.limit);
+    const endTime = req.query.endTime === undefined ? undefined : Number(req.query.endTime);
+    const result = await historicalCandles.getOneMinuteCandles(symbol, limit, endTime);
+    res.json(result);
+  } catch (error) { apiError(res, error); }
 });
 
 app.get('/api/market/feeds', (_req, res) => {
