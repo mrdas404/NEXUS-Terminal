@@ -1,0 +1,83 @@
+name: Dependency security audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/quotex-edition
+    paths:
+      - 'backend/package.json'
+      - 'backend/package-lock.json'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - '.github/workflows/dependency-security-audit.yml'
+  pull_request:
+    branches:
+      - feature/quotex-edition
+    paths:
+      - 'backend/package.json'
+      - 'backend/package-lock.json'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - '.github/workflows/dependency-security-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Audit ${{ matrix.project }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: backend
+            directory: backend
+          - project: frontend
+            directory: frontend
+    defaults:
+      run:
+        working-directory: ${{ matrix.directory }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.directory }}/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Report all dependency advisories and enforce critical/high gate
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > npm-audit.json
+          audit_exit=$?
+          set -e
+          node <<'NODE'
+          const fs = require('node:fs');
+          const audit = JSON.parse(fs.readFileSync('npm-audit.json', 'utf8'));
+          const counts = audit.metadata?.vulnerabilities ?? {};
+          const findings = Object.entries(audit.vulnerabilities ?? {}).map(([name, item]) => ({
+            package: name,
+            severity: item.severity,
+            direct: item.isDirect,
+            installedNodes: item.nodes,
+            affectedRange: item.range,
+            advisories: (item.via ?? []).filter(v => typeof v === 'object').map(v => ({
+              title: v.title,
+              url: v.url,
+              range: v.range,
+              cve: v.cve,
+              ghsa: v.url?.match(/GHSA-[a-z0-9-]+/i)?.[0] ?? null
+            })),
+            fixAvailable: item.fixAvailable
+          }));
+          console.log(JSON.stringify({ counts, findings }, null, 2));
+          if ((counts.critical ?? 0) > 0 || (counts.high ?? 0) > 0) {
+            console.error('Security gate failed: critical/high dependency advisories remain.');
+            process.exit(1);
+          }
+          NODE
+          exit $audit_exit
