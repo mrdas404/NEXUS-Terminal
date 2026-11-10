@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ResearchStore } from '../src/services/ResearchStore';
 import type { Candle } from '../src/types';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 const candle=(openTime:number,close=101):Candle=>({
   symbol:'BTC/USDT',marketType:'LIVE',source:'PROVIDER_API',timeframe:'1m',
@@ -42,5 +45,56 @@ test('rejects mixed streams in a single persistence batch',()=>{
   const store=new ResearchStore(':memory:');
   try{
     assert.throws(()=>store.saveCandles([candle(60_000),{...candle(120_000),source:'SIMULATED'}]),/mixed candle streams/);
+  }finally{store.close();}
+});
+
+
+test('strict imports reject duplicates while provider upserts remain idempotent',()=>{
+  const store=new ResearchStore(':memory:');
+  try{
+    store.saveCandles([candle(60_000)]);
+    assert.throws(()=>store.saveCandles([candle(60_000,102)]));
+    store.upsertCandles([candle(60_000,103)]);
+    assert.equal(store.getCandles({symbol:'BTC/USDT',marketType:'LIVE',source:'PROVIDER_API'})[0].close,103);
+  }finally{store.close();}
+});
+
+test('rolls back an entire candle batch when a later row is invalid',()=>{
+  const store=new ResearchStore(':memory:');
+  try{
+    assert.throws(()=>store.saveCandles([candle(60_000),{...candle(120_000),high:97}]),/invalid OHLC/);
+    assert.equal(store.getCandles({symbol:'BTC/USDT',marketType:'LIVE',source:'PROVIDER_API'}).length,0);
+  }finally{store.close();}
+});
+
+test('keeps LIVE and OTC candles isolated for the same symbol and time',()=>{
+  const store=new ResearchStore(':memory:');
+  try{
+    store.saveCandles([candle(60_000)]);
+    store.saveCandles([{...candle(60_000),marketType:'OTC',source:'QUOTEX_WEBSOCKET',close:202,high:205}]);
+    assert.equal(store.getCandles({symbol:'BTC/USDT',marketType:'LIVE',source:'PROVIDER_API'})[0].close,101);
+    assert.equal(store.getCandles({symbol:'BTC/USDT',marketType:'OTC',source:'QUOTEX_WEBSOCKET'})[0].close,202);
+  }finally{store.close();}
+});
+
+test('recovers persisted candles after closing and reopening the SQLite file',()=>{
+  const directory=mkdtempSync(path.join(tmpdir(),'nexus-integrity-'));
+  const databasePath=path.join(directory,'research.db');
+  try{
+    const first=new ResearchStore(databasePath);
+    first.saveCandles([candle(60_000),candle(120_000)]);
+    first.close();
+    const recovered=new ResearchStore(databasePath);
+    try{
+      const rows=recovered.getRecentCandles({symbol:'BTC/USDT',marketType:'LIVE',source:'PROVIDER_API',limit:10});
+      assert.deepEqual(rows.map(row=>row.openTime),[60_000,120_000]);
+    }finally{recovered.close();}
+  }finally{rmSync(directory,{recursive:true,force:true});}
+});
+
+test('rejects non-canonical one-minute timestamps',()=>{
+  const store=new ResearchStore(':memory:');
+  try{
+    assert.throws(()=>store.saveCandles([{...candle(60_001),openTime:60_001,closeTime:120_000}]),/invalid OHLC/);
   }finally{store.close();}
 });
