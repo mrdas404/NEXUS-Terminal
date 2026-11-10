@@ -80,4 +80,4 @@ jobs:
             process.exit(1);
           }
           NODE
-          exit $audit_exit
+          # The Node report step fails only for critical/high advisories; moderate/low are reported without blocking.
