@@ -8,7 +8,9 @@
     "dev": "nodemon server.ts",
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "tsc --outDir dist && node --test dist/tests/*.test.js"
+    "test": "tsc --outDir dist && node --test dist/tests/*.test.js",
+    "start:prod": "node dist/server.js",
+    "backup": "node dist/scripts/backup.js"
   },
   "keywords": [],
   "author": "",
