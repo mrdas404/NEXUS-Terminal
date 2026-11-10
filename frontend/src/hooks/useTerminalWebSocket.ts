@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { unpack } from 'msgpackr';
+import { apiUrl, apiOrigin } from '../lib/api';
 import type { Asset, ExchangeName, PriceUpdate, Signal, OrderBook, SentimentData } from '../types';
 
 export interface MarketFeedStatus {
@@ -49,7 +50,7 @@ export interface TerminalState {
   marketGaps: MarketCandleGap[];
 }
 
-const WS_URL = (import.meta.env.VITE_WS_URL || window.location.protocol.replace('http','ws') + '//' + window.location.host + '/ws').replace(/^http/,'ws');
+const WS_URL = (import.meta.env.VITE_WS_URL || (apiOrigin ? apiOrigin.replace(/^http/, 'ws') + '/ws' : window.location.protocol.replace('http','ws') + '//' + window.location.host + '/ws')).replace(/^http/,'ws');
 const INITIAL_PRICES: Record<Asset, Record<ExchangeName, number | null>> = {
   'BTC/USDT': { Binance: null, Coinbase: null, Uniswap: null },
   'ETH/USDT': { Binance: null, Coinbase: null, Uniswap: null },
@@ -59,7 +60,6 @@ const INITIAL_HISTORY: Record<Asset, { time: number; price: number }[]> = {
   'BTC/USDT': [], 'ETH/USDT': [], 'SOL/USDT': [],
 };
 const MAX_HISTORY_POINTS = 60;
-const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
 export function useTerminalWebSocket() {
   const [state, setState] = useState<TerminalState>({
@@ -71,7 +71,7 @@ export function useTerminalWebSocket() {
     const symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT'];
     await Promise.all(symbols.map(async symbol => {
       try {
-        const response = await fetch(`${API_URL}/api/market/candles?symbol=${encodeURIComponent(symbol)}&limit=300`, { signal });
+        const response = await fetch(apiUrl(`/api/market/candles?symbol=${encodeURIComponent(symbol)}&limit=300`), { signal, credentials: 'include' });
         if (!response.ok) throw new Error(`Historical candle API: HTTP ${response.status}`);
         const result = await response.json();
         if (result.marketType !== 'LIVE' || result.source !== 'PROVIDER_API' || result.timeframe !== '1m' || result.symbol !== symbol || !Array.isArray(result.candles)) return;
