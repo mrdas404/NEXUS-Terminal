@@ -1,0 +1,32 @@
+name: Deployment validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/quotex-edition]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker-compose.yml'
+      - '.dockerignore'
+      - '.github/workflows/deployment-validation.yml'
+  pull_request:
+    branches: [feature/quotex-edition]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker-compose.yml'
+      - '.dockerignore'
+      - '.github/workflows/deployment-validation.yml'
+
+jobs:
+  container-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Build backend production image
+        run: docker build -f backend/Dockerfile backend
+      - name: Build frontend production image
+        run: docker build -f frontend/Dockerfile frontend
