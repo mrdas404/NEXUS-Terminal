@@ -44,6 +44,7 @@ app.use((_req, res, next) => {
   next();
 });
 const allowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173').split(',').map(origin => origin.trim()).filter(Boolean);
+if (allowedOrigins.includes('*')) throw new Error('Wildcard CORS origins are not allowed with administrator sessions');
 app.use(cors({ origin: (origin, callback) => {
   if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) return callback(null, true);
   return callback(new Error('Origin is not allowed by CORS'));
@@ -53,7 +54,7 @@ const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 const requestIsSecure = (req: express.Request) => req.secure || req.headers['x-forwarded-proto'] === 'https';
 const requestOriginAllowed = (req: express.Request) => {
   const origin = req.headers.origin;
-  return !origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin);
+  return typeof origin === 'string' && allowedOrigins.includes(origin);
 };
 const sessionCookie = (token: string, req: express.Request) =>
   ADMIN_SESSION_COOKIE + '=' + encodeURIComponent(token) + '; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800' + (requestIsSecure(req) ? '; Secure' : '');
@@ -72,7 +73,11 @@ app.post('/api/auth/login', (req, res) => {
     res.setHeader('Retry-After', String(Math.ceil((attempt.resetAt - now) / 1000)));
     return res.status(429).json({ error: 'Too many login attempts. Try again later.' });
   }
-  if (!attempt || attempt.resetAt <= now) loginAttempts.set(ip, { count: 1, resetAt: now + 900000 });
+  if (!attempt || attempt.resetAt <= now) {
+    for (const [key, value] of loginAttempts) if (value.resetAt <= now) loginAttempts.delete(key);
+    if (!loginAttempts.has(ip) && loginAttempts.size >= 10000) loginAttempts.delete(loginAttempts.keys().next().value!);
+    loginAttempts.set(ip, { count: 1, resetAt: now + 900000 });
+  }
   else attempt.count += 1;
   const supplied = typeof req.body?.password === 'string' ? req.body.password : '';
   if (supplied.length > 1024 || !safeTextEqual(adminPassword, supplied)) return res.status(401).json({ error: 'Invalid administrator password' });
@@ -97,7 +102,7 @@ app.use('/api', (req, res, next) => {
 
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 1 * 1024 * 1024, perMessageDeflate: false, verifyClient: (info, done) => { const origin = info.origin; const originAllowed = !origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin); done(originAllowed && isAdminSessionValid(info.req.headers.cookie, sessionSecret), originAllowed ? 401 : 403, 'Authentication required'); } });
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 1 * 1024 * 1024, perMessageDeflate: false, verifyClient: (info, done) => { const origin = info.origin; const originAllowed = typeof origin === 'string' && allowedOrigins.includes(origin); done(originAllowed && isAdminSessionValid(info.req.headers.cookie, sessionSecret), originAllowed ? 401 : 403, 'Authentication required'); } });
 const marketDataFeed = new MarketDataFeedService();
 const researchStore = new ResearchStore(process.env.RESEARCH_DB_PATH);
 const historicalCandles = new HistoricalCandleService(researchStore);
