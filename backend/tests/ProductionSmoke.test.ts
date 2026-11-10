@@ -56,6 +56,7 @@ test('production server smoke: health, readiness, MessagePack WebSocket and grac
     assert.equal(initial.data.marketFeed.source,'PROVIDER_API');
     socket.close();
     await once(socket,'close');
+    await new Promise(resolve=>setTimeout(resolve,100));
 
     child.kill('SIGTERM');
     const [code,signal]=await once(child,'exit') as [number|null,NodeJS.Signals|null];
