@@ -1,22 +1,28 @@
 import { EventEmitter } from 'events';
 import { Asset, ExchangeName, PriceUpdate } from '../types';
 
-export class PriceStore extends EventEmitter {
-  // Current latest prices: prices[Asset][Exchange] = price
-  private prices: Record<Asset, Record<ExchangeName, number | null>> = {
-    'BTC/USDT': { Binance: null, Coinbase: null, Uniswap: null },
-    'ETH/USDT': { Binance: null, Coinbase: null, Uniswap: null },
-    'SOL/USDT': { Binance: null, Coinbase: null, Uniswap: null },
-  };
+type PriceMatrix = Record<Asset, Record<ExchangeName, number | null>>;
 
-  // Keep a tumbling window of prices for spike detection. Array of {price, timestamp}
+const createPriceMatrix = (): PriceMatrix => ({
+  'BTC/USDT': { Binance: null, Coinbase: null, Uniswap: null },
+  'ETH/USDT': { Binance: null, Coinbase: null, Uniswap: null },
+  'SOL/USDT': { Binance: null, Coinbase: null, Uniswap: null },
+});
+
+export class PriceStore extends EventEmitter {
+  // Only verified, non-simulated prices are exposed through getPrices().
+  private prices: PriceMatrix = createPriceMatrix();
+
+  // Demo/fallback prices are kept separately and never enter arbitrage calculations.
+  private simulatedPrices: PriceMatrix = createPriceMatrix();
+
+  // Keep a tumbling window of live prices for spike detection.
   private history: Record<Asset, Record<ExchangeName, { price: number; timestamp: number }[]>> = {
     'BTC/USDT': { Binance: [], Coinbase: [], Uniswap: [] },
     'ETH/USDT': { Binance: [], Coinbase: [], Uniswap: [] },
     'SOL/USDT': { Binance: [], Coinbase: [], Uniswap: [] },
   };
 
-  // 30 seconds history window
   private readonly HISTORY_WINDOW_MS = 30 * 1000;
 
   constructor() {
@@ -25,26 +31,36 @@ export class PriceStore extends EventEmitter {
 
   public updatePrice(update: PriceUpdate) {
     const { asset, exchange, price, timestamp } = update;
-    
-    // Update current price
+
+    if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(timestamp)) {
+      return;
+    }
+
+    if (update.dataMode === 'SIMULATED') {
+      this.simulatedPrices[asset][exchange] = price;
+      this.emit('simulated_price_update', update);
+      return;
+    }
+
     this.prices[asset][exchange] = price;
 
-    // Update history
     const historyList = this.history[asset][exchange];
     historyList.push({ price, timestamp });
 
-    // Prune history
     const cutoff = timestamp - this.HISTORY_WINDOW_MS;
     while (historyList.length > 0 && historyList[0].timestamp < cutoff) {
       historyList.shift();
     }
 
-    // Emit event for detection engine & clients
     this.emit('price_update', update);
   }
 
-  public getPrices() {
+  public getPrices(): PriceMatrix {
     return this.prices;
+  }
+
+  public getSimulatedPrices(): PriceMatrix {
+    return this.simulatedPrices;
   }
 
   public getPrice(asset: Asset, exchange: ExchangeName) {
