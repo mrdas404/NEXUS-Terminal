@@ -49,7 +49,7 @@ export interface TerminalState {
   marketGaps: MarketCandleGap[];
 }
 
-const WS_URL = (import.meta.env.VITE_WS_URL || window.location.protocol.replace('http','ws') + '//' + window.location.host).replace(/^http/,'ws');
+const WS_URL = (import.meta.env.VITE_WS_URL || window.location.protocol.replace('http','ws') + '//' + window.location.host + '/ws').replace(/^http/,'ws');
 const INITIAL_PRICES: Record<Asset, Record<ExchangeName, number | null>> = {
   'BTC/USDT': { Binance: null, Coinbase: null, Uniswap: null },
   'ETH/USDT': { Binance: null, Coinbase: null, Uniswap: null },
