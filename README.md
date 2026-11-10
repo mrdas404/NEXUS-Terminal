@@ -221,3 +221,16 @@ Research API endpoints (all under `/api`):
 Paper recovery stores each processed candle and replays them in chronological order on session creation/recovery. Engine options are stored with the snapshot and checked during recovery. Candle + snapshot writes are committed in one SQLite transaction. Reset clears the replay log and trade rows. Set `RESEARCH_DB_PATH` to choose a dedicated SQLite database; otherwise the backend's existing Prisma SQLite file is used.
 
 These endpoints accept caller-provided historical/research candles. They do not connect to Quotex, fetch live market data, or place broker orders. Do not send untrusted provider data without validating its provenance.
+
+
+### Phase 3.2 REST API and recovery
+
+- `POST /api/research/import-csv` — JSON body: `{ "stream": { "symbol": "BTC/USDT", "marketType": "LIVE", "source": "PROVIDER_API" }, "csv": "timestamp,open,high,low,close\\n..." }`.
+- `POST /api/research/backtests` — JSON body: `{ "stream": { ... }, "options": { "initialBalance": 10000, "stake": 10, "payoutRate": 0.8, "expiryCandles": 1 } }`.
+- `GET /api/research/backtests/:reportId` — retrieve a saved report.
+- `POST /api/paper/sessions` — create a virtual session; repeat with the same ID to recover it. Saved options are preserved and mismatched options are rejected.
+- `GET /api/paper/sessions/:sessionId` — retrieve saved snapshot and trades.
+- `POST /api/paper/sessions/:sessionId/candles` — process one closed 1-minute candle.
+- `POST /api/paper/sessions/:sessionId/reset` — reset the virtual session and replay log.
+
+Recovery rebuilds the in-memory engine by replaying persisted candles, then compares the reconstructed snapshot and trade ledger with the saved state. Corrupt or inconsistent recovery is rejected rather than silently continued. The research API is intended for a trusted local/development environment; do not expose it publicly without authentication, TLS, and request controls. Paper endpoints remain virtual-only.
