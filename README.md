@@ -234,3 +234,10 @@ These endpoints accept caller-provided historical/research candles. They do not 
 - `POST /api/paper/sessions/:sessionId/reset` — reset the virtual session and replay log.
 
 Recovery rebuilds the in-memory engine by replaying persisted candles, then compares the reconstructed snapshot and trade ledger with the saved state. Corrupt or inconsistent recovery is rejected rather than silently continued. The research API is intended for a trusted local/development environment; do not expose it publicly without authentication, TLS, and request controls. Paper endpoints remain virtual-only.
+
+
+## Quotex Edition — Phase 4 research dashboard
+
+The frontend Research view provides historical CSV import, backtest execution/report review, and SQLite-backed paper-session creation/recovery. It displays report metrics and virtual trade history, and can submit a closed 1-minute candle to a paper session. Symbol, LIVE/OTC market type and data source are explicit selections and remain isolated.
+
+Set `VITE_API_URL` when the backend is not at `http://localhost:3001`. Start backend and frontend separately. This interface is for historical research and virtual paper trading only; it does not place broker orders. Feed only candles from a verified source and never label simulated data as LIVE/OTC.
