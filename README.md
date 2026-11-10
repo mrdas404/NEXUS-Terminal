@@ -370,3 +370,8 @@ The `Deployment validation` GitHub Actions workflow checks Compose syntax and bu
 - Define a tested deployment rollback procedure and pin/scan production image dependencies.
 - Run browser-level, long-duration network and host-restart tests in the target environment.
 - Binance public Spot remains LIVE crypto reference data only; it is not Quotex OTC data. LIVE and OTC streams must remain separate.
+
+
+### Security audit status — deployment blocker
+
+The backend dependency audit on 2026-11-10 reported **9 advisories: 1 critical, 4 high and 4 moderate** (including transitive packages such as `proxy-addr`, `ws`, `body-parser` and `path-to-regexp`). npm reports available fixes, but they have not yet been applied to the lockfile or revalidated. Do not treat this branch as public-production-ready until dependency remediation is reviewed, committed, and the audit is rerun with no critical/high findings.
