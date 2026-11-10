@@ -17,7 +17,8 @@ export class PersistentPaperTradingService {
       const candles=store.getPaperCandles(sessionId);
       for(const candle of candles)this.engine.processCandle(candle);
       const restored=this.engine.getSnapshot();
-      if(restored.balance!==saved.balance||restored.trades.length!==store.getPaperTrades(sessionId).length)
+      if(JSON.stringify(restored)!==JSON.stringify(saved.snapshot)||
+         JSON.stringify(restored.trades)!==JSON.stringify(store.getPaperTrades(sessionId)))
         throw new Error('Paper session recovery integrity check failed');
     }else this.persistSnapshot();
   }
@@ -27,6 +28,7 @@ export class PersistentPaperTradingService {
     return update;
   }
   public getSnapshot(){return this.engine.getSnapshot();}
+  public getOptions():PaperTradingOptions{return this.engine.getOptions();}
   public reset(){this.engine.reset();this.store.clearPaperSession(this.sessionId,this.engine.getSnapshot());}
   private persistSnapshot(){this.store.savePaperSnapshot(this.sessionId,this.engine.getSnapshot());}
 }
