@@ -159,6 +159,7 @@ export class PaperTradingEngine {
   public getSnapshot(): {
     balance: number;
     initialBalance: number;
+    options: PaperTradingOptions;
     netPnl: number;
     openTrade: PaperTrade | null;
     pendingDirection: TradeDirection | null;
