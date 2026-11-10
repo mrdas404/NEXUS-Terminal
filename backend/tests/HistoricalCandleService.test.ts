@@ -6,15 +6,16 @@ import { ResearchStore } from '../src/services/ResearchStore';
 const originalFetch=global.fetch;
 const now=Date.now();
 const cachedOpenTime=Math.floor((now-120_000)/60_000)*60_000;
+const currentMinute=Math.floor(now/60_000)*60_000;
 const row=(openTime:number,closeTime:number,close='101')=>[
   openTime,'100','105','98',close,'12.5',closeTime,'0','0','0','0','0'
 ];
 
 test('returns only complete, valid LIVE provider candles in ascending order',async()=>{
   global.fetch=async()=>new Response(JSON.stringify([
-    row(now-180_000,now-120_001),
-    row(now-60_000,now+60_000), // still open
-    row(now-120_000,now-60_001,'not-a-price')
+    row(currentMinute-120_000,currentMinute-60_001),
+    row(currentMinute,currentMinute+59_999), // still open
+    row(currentMinute-60_000,currentMinute-1,'not-a-price')
   ]),{status:200}) as Response;
   try{
     const result=await new HistoricalCandleService().getOneMinuteCandles('BTC/USDT',3);
