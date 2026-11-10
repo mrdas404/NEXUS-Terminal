@@ -149,3 +149,40 @@ Phase 2 adds deterministic, read-only technical analysis utilities. These functi
 
 ### Validation
 Run `npm install` and then `npm run build` from `backend/` to run the strict TypeScript compiler check. No test runner is configured yet; historical-data backtesting and paper-trading execution remain follow-up work. Do not interpret the confidence score as a win probability or use unvalidated signals for real-money trades.
+
+
+## Quotex Edition — Phase 3 backtesting and paper trading
+
+Phase 3 adds a historical candle replay engine and an in-memory virtual-balance simulator. Both are read-only research tools; neither connects to a Quotex account or sends real orders.
+
+### Historical backtesting
+
+- Replays chronological 1-minute candles from exactly one symbol, market type and data source.
+- A signal is evaluated only after candle `i` closes; entry uses candle `i+1` open, and expiry uses the configured future candle close. This avoids same-candle look-ahead.
+- Reports wins, losses, ties, win rate (ties excluded), net P&L, ending balance, return, max drawdown and profit factor.
+- Fixed-stake binary payout model: a win earns `stake × payoutRate`, a loss loses the stake, and an exact-price tie refunds the stake.
+- The payout rate is a configurable assumption, not a broker quote. Fees, slippage, quote differences and execution latency are not modelled.
+
+### Paper trading
+
+- Uses a virtual balance only; the stake is reserved when a paper position opens.
+- Signals are queued at candle close and entered at the next candle open.
+- Supports configurable stake, payout rate and expiry measured in 1-minute candles.
+- Exposes an in-memory snapshot and trade history; call `reset()` to clear the session.
+- Each engine instance is locked to one symbol/market/source stream. Use separate instances for LIVE and OTC, and for distinct providers.
+
+### Validation
+
+From `backend/` run:
+
+```bash
+npm ci
+npm test
+npm run build
+```
+
+A GitHub Actions workflow runs the backend test and TypeScript build checks on pushes and pull requests targeting `feature/quotex-edition`. These results must be green before treating the code as validated.
+
+### Limitations and risk
+
+The backtester and paper trader are not evidence of a profitable strategy. A high historical win rate can be caused by overfitting, small samples or unrealistic payout assumptions. Use out-of-sample data, realistic provider-specific OTC/LIVE candles and a sufficiently large sample. Signal confidence remains a rule-alignment score, not a probability. No real-money automation is included.
