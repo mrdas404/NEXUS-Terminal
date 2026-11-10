@@ -311,3 +311,62 @@ The optional paper bridge is deliberately manual: the user must create/recover a
 ### Production configuration
 
 Copy `backend/.env.example` to `backend/.env`, set an explicit `CORS_ORIGINS` list for the deployed frontend origin, and configure `CORE_DB_PATH` and `RESEARCH_DB_PATH` to persistent writable paths. Do not commit secrets or session credentials. Put the backend behind HTTPS/WSS at the deployment proxy and configure `VITE_API_URL` / `VITE_WS_URL` for the frontend build.
+
+
+## Quotex Edition — Phase 5.8 deployment, monitoring and operational security
+
+### Private-by-default Docker deployment
+
+The repository now includes a Docker Compose deployment:
+- `backend/Dockerfile`: multi-stage Node 22 image, compiled TypeScript runtime, non-root application user, read-only root filesystem, persistent SQLite volume and readiness health check.
+- `frontend/Dockerfile` + `frontend/nginx.conf`: static frontend served by unprivileged Nginx on port 8080; same-origin `/api/`, `/health`, `/ready` and `/ws` proxy routes.
+- `docker-compose.yml`: backend is internal-only (not published to the host); frontend binds to loopback by default (`127.0.0.1:8080)); containers drop Linux capabilities and disallow privilege escalation.
+- WebSocket now uses the dedicated `/ws` path. The frontend defaults to same-origin HTTP/HTTPS and WS/WSS URLs, avoiding hard-coded localhost URLs in the production bundle.
+
+Start locally:
+```bash
+cp .env.example .env
+docker compose up --build -d
+docker compose ps
+```
+Open `http://127.0.0.1:8080`. To bind a different local port, set `APP_PORT` in the root `.env`. The frontend port is intentionally bound to loopback; the backend has no host-published port.
+
+### Important security boundary
+
+**This application does not yet implement user authentication, authorization, API keys, or per-user sessions. CORS is not authentication.** Do not publish the Compose frontend directly to the public internet. If remote access is required, keep the service behind an authenticated VPN or an identity-aware reverse proxy, terminate TLS there, and allow only trusted users. Configure `CORS_ORIGINS` to the exact browser origin (for example, `https://terminal.example.com`); do not use a wildcard. Do not place Quotex credentials, cookies, SSIDs, tokens, RPC secrets or other credentials in Git. No real-money trading or broker order endpoint is enabled.
+
+### Monitoring and logs
+
+- Container health checks call backend `/ready` (SQLite connectivity and research DB integrity) and frontend HTTP health.
+- `/health` is process liveness; `/ready` is readiness. A healthy HTTP process does not prove the upstream market feed is connected.
+- Backend HTTP requests emit structured JSON logs with method, path, status and duration; avoid adding secrets or request bodies to logs.
+- Inspect status/logs with:
+```bash
+docker compose ps
+docker compose logs --tail=200 backend
+docker compose logs -f frontend backend
+curl -fsS http://127.0.0.1:8080/health
+curl -fsS http://127.0.0.1:8080/ready
+```
+
+### SQLite backup
+
+A backup utility uses SQLite's online backup API, runs `quick_check` before and after copying, and applies configurable retention (1–365 days). Run it manually:
+```bash
+docker compose --profile backup run --rm backup
+```
+Backups are stored in the persistent Docker volume `backup-data`. Export that volume to encrypted off-host storage as part of the host's backup process. The utility is not a scheduler; configure a host-level scheduler and alert on non-zero exit codes. Keep at least one off-host copy. A production restore drill and off-host retention policy are still required before claiming disaster-recovery readiness.
+
+### Deployment validation
+
+The `Deployment validation` GitHub Actions workflow checks Compose syntax and builds both production container images. Backend and frontend test/build workflows continue to run independently. This CI does not deploy to a cloud host, configure DNS/TLS, test a particular reverse proxy, or validate a live Quotex/OTC feed.
+
+### Operational limitations before public production
+
+- Add authentication and authorization before any public exposure.
+- Configure and test TLS, authenticated ingress, firewall rules, DNS and secret management on the actual host.
+- Schedule off-host backups and perform a documented restore drill.
+- Add external uptime/alerting and retention for logs; monitor feed staleness separately from process health.
+- Define a tested deployment rollback procedure and pin/scan production image dependencies.
+- Run browser-level, long-duration network and host-restart tests in the target environment.
+- Binance public Spot remains LIVE crypto reference data only; it is not Quotex OTC data. LIVE and OTC streams must remain separate.
