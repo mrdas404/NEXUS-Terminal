@@ -3,6 +3,7 @@ import type { Candle } from '../types';
 import type { BacktestReport } from './BacktestingEngine';
 import type { PaperTrade } from './PaperTradingEngine';
 import path from 'node:path';
+import fs from 'node:fs';
 
 export interface StoredPaperSession {
   sessionId: string; initialBalance: number; balance: number; netPnl: number;
@@ -17,7 +18,9 @@ type PaperSnapshot = {
 export class ResearchStore {
   private readonly db:Database.Database;
   constructor(databasePath=path.resolve(process.cwd(),'prisma/dev.db')) {
-    this.db=new Database(databasePath);
+    const resolvedPath=databasePath===':memory:'?databasePath:path.resolve(databasePath);
+    if(resolvedPath!==':memory:')fs.mkdirSync(path.dirname(resolvedPath),{recursive:true});
+    this.db=new Database(resolvedPath);
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('synchronous = NORMAL');
     this.db.pragma('foreign_keys = ON');
