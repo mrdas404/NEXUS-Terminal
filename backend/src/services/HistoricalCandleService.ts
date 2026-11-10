@@ -54,7 +54,7 @@ export class HistoricalCandleService {
       candles.push({symbol,marketType:'LIVE',source:'PROVIDER_API',timeframe:'1m',openTime:ot,closeTime:ct,open:o,high:h,low:l,close:c,volume:v});
     }
     candles.sort((a,b)=>a.openTime-b.openTime);
-    if(this.store&&candles.length)this.store.saveCandles(candles);
+    if(this.store&&candles.length)this.store.upsertCandles(candles);
     const merged=new Map<number,Candle>();
     for(const candle of cached??[])merged.set(candle.openTime,candle);
     for(const candle of candles)merged.set(candle.openTime,candle);
