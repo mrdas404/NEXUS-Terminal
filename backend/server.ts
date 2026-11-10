@@ -26,17 +26,30 @@ import './src/exchanges/Coinbase';
 import './src/exchanges/Uniswap';
 
 const app = express();
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+const allowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173').split(',').map(origin => origin.trim()).filter(Boolean);
+app.use(cors({ origin: (origin, callback) => {
+  if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) return callback(null, true);
+  return callback(new Error('Origin is not allowed by CORS'));
+}, credentials: false }));
+app.use(express.json({ limit: '2mb' }));
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ server, maxPayload: 1 * 1024 * 1024, perMessageDeflate: false });
 const marketDataFeed = new MarketDataFeedService();
 const researchStore = new ResearchStore(process.env.RESEARCH_DB_PATH);
 const historicalCandles = new HistoricalCandleService(researchStore);
 
 let currentSignals: any[] = [];
 const clients: Set<WebSocket> = new Set();
+const heartbeatTimer = setInterval(() => {
+  for (const client of clients) {
+    const peer = client as WebSocket & { isAlive?: boolean };
+    if (peer.isAlive === false) { client.terminate(); clients.delete(client); continue; }
+    peer.isAlive = false;
+    client.ping();
+  }
+}, 30_000);
+heartbeatTimer.unref();
 
 // Binary MessagePack broadcast — ~60–80% smaller than JSON
 const broadcast = (message: any) => {
@@ -85,6 +98,9 @@ sentimentEngine.on('sentiment_update', (sentiment) => {
 // ── WebSocket Connections ──────────────────────────────────────
 wss.on('connection', (ws) => {
   clients.add(ws);
+  const peer = ws as WebSocket & { isAlive?: boolean };
+  peer.isAlive = true;
+  ws.on('pong', () => { peer.isAlive = true; });
   console.log('[WS] Client connected');
 
   // Send initial state as binary MessagePack
@@ -106,8 +122,15 @@ wss.on('connection', (ws) => {
 });
 
 // ── REST API ───────────────────────────────────────────────────
-app.get('/health', (req, res) => {
-  res.json({ status: 'Terminal Backend Active', pnl: detectionEngine.totalPnl, marketFeed: marketDataFeed.getStatus() });
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', uptimeSeconds: Math.floor(process.uptime()), marketFeed: marketDataFeed.getStatus() });
+});
+
+app.get('/ready', (_req, res) => {
+  const researchDb = researchStore.healthCheck();
+  const coreDb = db.healthCheck();
+  const ready = researchDb.ok && coreDb;
+  res.status(ready ? 200 : 503).json({ ready, databases: { research: researchDb, core: { ok: coreDb } } });
 });
 
 app.get('/api/market/candles', async (req, res) => {
@@ -249,7 +272,23 @@ const recentSignals = db.getRecentSignals(50);
 currentSignals.push(...recentSignals);
 console.log(`[DB] Loaded ${recentSignals.length} historical signals, PNL: $${detectionEngine.totalPnl.toFixed(2)}`);
 
-server.listen(PORT, () => {
+const shutdown = (signal: string) => {
+  console.log(`[Shutdown] ${signal} received; closing services`);
+  marketDataFeed.stop();
+  clearInterval(heartbeatTimer);
+  for (const client of clients) client.close(1001, 'Server shutting down');
+  wss.close();
+  server.close(() => {
+    researchStore.close();
+    db.close();
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10_000).unref();
+};
+process.once('SIGTERM', () => shutdown('SIGTERM'));
+process.once('SIGINT', () => shutdown('SIGINT'));
+
+server.listen(Number(PORT), () => {
   marketDataFeed.start();
   console.log(`[HTTP] Server running on port ${PORT}`);
   console.log(`[WS]  Binary MessagePack WebSocket on port ${PORT}`);
