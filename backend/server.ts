@@ -222,7 +222,8 @@ const recentSignals = db.getRecentSignals(50);
 currentSignals.push(...recentSignals);
 console.log(`[DB] Loaded ${recentSignals.length} historical signals, PNL: $${detectionEngine.totalPnl.toFixed(2)}`);
 
-server.listen(PORT, () => {\n  marketDataFeed.start();
+server.listen(PORT, () => {
+  marketDataFeed.start();
   console.log(`[HTTP] Server running on port ${PORT}`);
   console.log(`[WS]  Binary MessagePack WebSocket on port ${PORT}`);
 });
