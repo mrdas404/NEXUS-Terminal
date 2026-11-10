@@ -26,6 +26,14 @@ import './src/exchanges/Coinbase';
 import './src/exchanges/Uniswap';
 
 const app = express();
+app.disable('x-powered-by');
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
 const allowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173').split(',').map(origin => origin.trim()).filter(Boolean);
 app.use(cors({ origin: (origin, callback) => {
   if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) return callback(null, true);
@@ -34,7 +42,7 @@ app.use(cors({ origin: (origin, callback) => {
 app.use(express.json({ limit: '2mb' }));
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, maxPayload: 1 * 1024 * 1024, perMessageDeflate: false });
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 1 * 1024 * 1024, perMessageDeflate: false });
 const marketDataFeed = new MarketDataFeedService();
 const researchStore = new ResearchStore(process.env.RESEARCH_DB_PATH);
 const historicalCandles = new HistoricalCandleService(researchStore);
