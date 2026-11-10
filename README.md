@@ -265,3 +265,12 @@ Configure `VITE_WS_URL` for the backend WebSocket when it is not at `ws://localh
 The Market view now retains validated Binance LIVE / PROVIDER_API one-minute candles (up to 300 per symbol) and renders them in a candlestick chart. This is an in-memory browser-session window; it is not historical backfill and clears on refresh.
 
 The optional paper bridge is deliberately manual: the user must create/recover a virtual paper session, explicitly opt in, and press "Send one candle". It submits only the latest closed LIVE / PROVIDER_API 1m candle. There is no automatic feed forwarding and no broker order execution. The paper session is stream-locked by the backend; changing symbol/source within the same session is rejected by the paper engine. A fresh session is required for another stream.
+
+
+## Phase 5.4 — Historical candle backfill and recovery
+
+- `GET /api/market/candles?symbol=BTC%2FUSDT&limit=300` fetches up to 300 complete 1-minute candles from Binance Spot REST.
+- Supported symbols are BTC/USDT, ETH/USDT and SOL/USDT. The API labels all results LIVE / PROVIDER_API and excludes the still-open candle.
+- The frontend loads history on startup and again after the market WebSocket reconnects, merging by candle open time so recent live candles take precedence.
+- The browser chart retains at most 300 candles per symbol. This is a bounded recent window, not a full archive.
+- No OTC, simulated, or Quotex quote is inferred from Binance data. Paper trading remains a separate explicit manual action.
