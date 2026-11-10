@@ -22,8 +22,8 @@ test('persists LIVE candles and returns them in chronological order',()=>{
 test('upserts a duplicate candle without creating duplicate rows',()=>{
   const store=new ResearchStore(':memory:');
   try{
-    store.saveCandles([candle(60_000,101)]);
-    store.saveCandles([candle(60_000,102)]);
+    store.upsertCandles([candle(60_000,101)]);
+    store.upsertCandles([candle(60_000,102)]);
     const result=store.getCandles({symbol:'BTC/USDT',marketType:'LIVE',source:'PROVIDER_API'});
     assert.equal(result.length,1);
     assert.equal(result[0].close,102);
