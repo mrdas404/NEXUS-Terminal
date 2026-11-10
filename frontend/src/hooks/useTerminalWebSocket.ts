@@ -54,7 +54,7 @@ const INITIAL_HISTORY: Record<Asset, { time: number; price: number }[]> = {
   'BTC/USDT': [], 'ETH/USDT': [], 'SOL/USDT': [],
 };
 const MAX_HISTORY_POINTS = 60;
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3001').replace(/\\/$/, '');
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3001').replace(/\/$/, '');
 
 const recoverHistoricalCandles = async (signal?: AbortSignal) => {
   const symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT'];
