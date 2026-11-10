@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { MarketCandle } from '../hooks/useTerminalWebSocket';
 import { ShieldCheck, Send, RefreshCw } from 'lucide-react';
-const API=(import.meta.env.VITE_API_URL||'http://localhost:3001').replace(/\/$/,'');
+import { apiUrl } from '../lib/api';
 interface Props { candles:MarketCandle[]; }
 interface Snapshot { balance:number;netPnl:number;trades:any[];stream:any; }
 const OPTIONS={initialBalance:10000,stake:10,payoutRate:0.8,expiryCandles:1};
@@ -11,7 +11,7 @@ export function LivePaperFeedBridge({candles}:Props){
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState(''),[lastSent,setLastSent]=useState('');
  const latest=[...candles].sort((a,b)=>b.closeTime-a.closeTime)[0];
  async function request<T>(path:string,body?:unknown):Promise<T>{
-  const response=await fetch(API+path,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
+  const response=await fetch(apiUrl(path),{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),credentials:'include'});
   const result=await response.json().catch(()=>({error:'Invalid server response'}));if(!response.ok)throw new Error(result.error||'Request failed');return result as T;
  }
  async function run(action:()=>Promise<void>){setBusy(true);setMessage('');setError('');try{await action();}catch(e){setError(e instanceof Error?e.message:'Request failed');}finally{setBusy(false);}}
