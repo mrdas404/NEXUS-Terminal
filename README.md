@@ -284,3 +284,13 @@ The optional paper bridge is deliberately manual: the user must create/recover a
 - `GET /api/market/candles/archive` provides the persistent LIVE / PROVIDER_API archive with optional `startTime` and `endTime` Unix-millisecond filters.
 - This archive persists across browser refreshes and backend restarts when the configured SQLite file is persistent. It does not guarantee recovery of data from periods when the service was offline; no provider backfill pagination beyond the requested latest 300 candles is implemented.
 - OTC and SIMULATED streams remain separate; this chart archive endpoint is intentionally restricted to LIVE / PROVIDER_API.
+
+
+## Phase 5.6 — Data integrity and recovery hardening
+
+- Binance trade IDs are retained on parsed ticks and used for bounded idempotency (last 5,000 IDs per stream key). Duplicate events do not double-count candle volume.
+- The candle builder rejects out-of-order timestamps, keeps market/source/symbol streams isolated, and emits explicit missing-minute gap metadata. Missing candles are not fabricated.
+- Gap events are broadcast to clients; the frontend records recent gaps, requests a fresh historical backfill, and aborts pending recovery requests on disconnect/unmount. Reconnect timers are cancelled on cleanup.
+- SQLite candle writes validate canonical one-minute boundaries and OHLCV values. Strict CSV imports retain duplicate rejection; provider history uses a separate transactional upsert method.
+- Added integrity tests for event parsing, duplicate ingestion, out-of-order ticks, gap detection, stream isolation, transactional rollback, strict-import vs upsert behavior, SQLite close/reopen recovery, and persistent paper-session replay.
+- These checks do not make Binance Spot equivalent to Quotex LIVE/OTC quotes. No synthetic candles are created to fill gaps, and no real-money orders are sent.
