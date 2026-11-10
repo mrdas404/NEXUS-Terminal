@@ -152,3 +152,12 @@ test('paper session restores pending/open trade and virtual balance after store 
   assert.equal(secondStore.getPaperTrades('recover-me').length,0);
  } finally { secondStore.close();rmSync(p,{force:true});rmSync(p+'-wal',{force:true});rmSync(p+'-shm',{force:true});}
 });
+
+
+test('paper session rejects changed options when restoring an existing session',()=>{
+ const p=join(tmpdir(),`nexus-options-${randomUUID()}.db`),store=new ResearchStore(p);
+ try{
+  new PersistentPaperTradingService('options-test',store,new PaperTradingEngine({initialBalance:200}));
+  assert.throws(()=>new PersistentPaperTradingService('options-test',store,new PaperTradingEngine({initialBalance:300})),/options do not match/);
+ }finally{store.close();rmSync(p,{force:true});rmSync(p+'-wal',{force:true});rmSync(p+'-shm',{force:true});}
+});
