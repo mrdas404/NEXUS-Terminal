@@ -1,6 +1,7 @@
 name: Backend validation
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - feature/quotex-edition
