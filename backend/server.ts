@@ -17,6 +17,7 @@ import { ResearchStore } from './src/services/ResearchStore';
 import { HistoricalResearchService } from './src/services/HistoricalResearchService';
 import { PersistentPaperTradingService } from './src/services/PersistentPaperTradingService';
 import { PaperTradingEngine, type PaperTradingOptions } from './src/services/PaperTradingEngine';
+import { MarketDataFeedService } from './src/services/MarketDataFeedService';
 
 // Initialize exchanges
 import './src/exchanges/Binance';
@@ -29,6 +30,7 @@ app.use(express.json({ limit: '10mb' }));
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
+const marketDataFeed = new MarketDataFeedService();
 
 let currentSignals: any[] = [];
 const clients: Set<WebSocket> = new Set();
@@ -65,7 +67,13 @@ orderBookService.on('orderbook_update', (book) => {
   broadcast({ type: 'ORDERBOOK_UPDATE', data: book });
 });
 
-// 4. Sentiment updates → broadcast binary
+// 4. Read-only public market feed → broadcast provenance-tagged ticks/candles
+marketDataFeed.on('tick', tick => broadcast({ type: 'MARKET_TICK', data: tick }));
+marketDataFeed.on('candle', candle => broadcast({ type: 'MARKET_CANDLE', data: candle }));
+marketDataFeed.on('closed_candle', candle => broadcast({ type: 'MARKET_CANDLE_CLOSED', data: candle }));
+marketDataFeed.on('status', status => broadcast({ type: 'MARKET_FEED_STATUS', data: status }));
+
+// 5. Sentiment updates → broadcast binary
 sentimentEngine.on('sentiment_update', (sentiment) => {
   broadcast({ type: 'SENTIMENT_UPDATE', data: sentiment });
 });
@@ -82,7 +90,7 @@ wss.on('connection', (ws) => {
       prices: priceStore.getPrices(),
       signals: currentSignals,
       pnl: detectionEngine.totalPnl,
-      sentiment: sentimentEngine.getSentiment(),
+      sentiment: sentimentEngine.getSentiment(),\n      marketFeed: marketDataFeed.getStatus(),
     }
   }));
 
@@ -206,7 +214,7 @@ const recentSignals = db.getRecentSignals(50);
 currentSignals.push(...recentSignals);
 console.log(`[DB] Loaded ${recentSignals.length} historical signals, PNL: $${detectionEngine.totalPnl.toFixed(2)}`);
 
-server.listen(PORT, () => {
+server.listen(PORT, () => {\n  marketDataFeed.start();
   console.log(`[HTTP] Server running on port ${PORT}`);
   console.log(`[WS]  Binary MessagePack WebSocket on port ${PORT}`);
 });
