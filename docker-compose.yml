@@ -8,6 +8,8 @@ services:
       CORE_DB_PATH: /data/core.sqlite
       RESEARCH_DB_PATH: /data/research.sqlite
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in the deployment environment}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in the deployment environment}
     volumes: [backend-data:/data]
     expose: ["3001"]
     init: true
