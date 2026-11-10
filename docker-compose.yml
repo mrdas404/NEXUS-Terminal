@@ -46,7 +46,7 @@ services:
       BACKUP_DIR: /backups
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
     command: [node, dist/scripts/backup.js]
-    volumes: [backend-data:/data, ./backups:/backups]
+    volumes: [backend-data:/data, backup-data:/backups]
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
 volumes:
