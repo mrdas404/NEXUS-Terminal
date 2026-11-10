@@ -241,3 +241,13 @@ Recovery rebuilds the in-memory engine by replaying persisted candles, then comp
 The frontend Research view provides historical CSV import, backtest execution/report review, and SQLite-backed paper-session creation/recovery. It displays report metrics and virtual trade history, and can submit a closed 1-minute candle to a paper session. Symbol, LIVE/OTC market type and data source are explicit selections and remain isolated.
 
 Set `VITE_API_URL` when the backend is not at `http://localhost:3001`. Start backend and frontend separately. This interface is for historical research and virtual paper trading only; it does not place broker orders. Feed only candles from a verified source and never label simulated data as LIVE/OTC.
+
+
+## Phase 5 — Read-only market data feed
+
+The backend can connect to Binance's public Spot trade WebSocket for BTC/USDT, ETH/USDT and SOL/USDT. It uses no API keys and exposes no order-placement functionality. Trades are normalized into `LIVE` + `PROVIDER_API` ticks, aggregated into isolated 1-minute candles, and broadcast to connected dashboard clients as MessagePack events: `MARKET_TICK`, `MARKET_CANDLE`, `MARKET_CANDLE_CLOSED`, and `MARKET_FEED_STATUS`.
+
+- `GET /api/market/feeds` reports provider, stream provenance, symbols, connection state, last-message time, reconnect attempts and last error.
+- Reconnect uses capped exponential backoff; a feed with no message for 15 seconds is reported as `STALE`.
+- Binance Spot data is not Quotex OTC data. OTC remains unavailable until a legitimate, authorized OTC data provider is configured. Do not relabel this crypto feed as Quotex pricing.
+- The existing frontend terminal socket receives feed events; paper sessions are not automatically traded from live data. Explicit session selection and virtual-only controls remain required.
