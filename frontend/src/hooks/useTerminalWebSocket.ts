@@ -56,6 +56,20 @@ const INITIAL_HISTORY: Record<Asset, { time: number; price: number }[]> = {
 const MAX_HISTORY_POINTS = 60;
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3001').replace(/\\/$/, '');
 
+const recoverHistoricalCandles = async (signal?: AbortSignal) => {
+  const symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT'];
+  await Promise.all(symbols.map(async symbol => {
+    try {
+      const response = await fetch(`${API_URL}/api/market/candles?symbol=${encodeURIComponent(symbol)}&limit=300`, { signal });
+      if (!response.ok) throw new Error(`Historical candle API: HTTP ${response.status}`);
+      const result = await response.json();
+      if (result.marketType !== 'LIVE' || result.source !== 'PROVIDER_API' || result.timeframe !== '1m' || result.symbol !== symbol || !Array.isArray(result.candles)) return;
+      const candles = (result.candles as MarketCandle[]).filter(c => c.marketType === 'LIVE' && c.source === 'PROVIDER_API' && c.timeframe === '1m' && Number.isFinite(c.openTime) && Number.isFinite(c.closeTime) && c.closeTime < Date.now() && [c.open,c.high,c.low,c.close,c.volume].every(Number.isFinite) && c.low > 0 && c.volume >= 0 && c.high >= Math.max(c.open,c.close,c.low) && c.low <= Math.min(c.open,c.close,c.high)).sort((a,b)=>a.openTime-b.openTime).slice(-300);
+      setState(s => { const live=s.marketCandles[symbol]||[]; const merged=[...candles,...live].reduce((acc,x)=>{acc.set(x.openTime,x);return acc;},new Map<number,MarketCandle>()); return {...s,marketCandles:{...s.marketCandles,[symbol]:[...merged.values()].sort((a,b)=>a.openTime-b.openTime).slice(-300)}}; });
+    } catch (error) { if (!signal?.aborted) console.warn('[Market] Historical candle recovery failed:', error); }
+  }));
+};
+
 export function useTerminalWebSocket() {
   const [state, setState] = useState<TerminalState>({
     prices: INITIAL_PRICES, signals: [], connected: false, history: INITIAL_HISTORY,
@@ -65,7 +79,7 @@ export function useTerminalWebSocket() {
   const connect = useCallback(() => {
     const ws = new WebSocket(WS_URL);
     ws.binaryType = 'arraybuffer';
-    ws.onopen = () => setState(s => ({ ...s, connected: true }));
+    ws.onopen = () => { setState(s => ({ ...s, connected: true })); void recoverHistoricalCandles(); };
     ws.onmessage = event => {
       try {
         const message = unpack(new Uint8Array(event.data as ArrayBuffer));
@@ -120,7 +134,7 @@ export function useTerminalWebSocket() {
     };
     ws.onerror = () => ws.close();
     return () => ws.close();
-  }, []);
+  }, [recoverHistoricalCandles]);
 
   useEffect(() => {
     let cancelled = false;
