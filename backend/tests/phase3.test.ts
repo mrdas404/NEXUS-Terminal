@@ -141,7 +141,8 @@ test('paper session restores pending/open trade and virtual balance after store 
  } finally { firstStore.close(); }
  const secondStore=new ResearchStore(p);
  try {
-  const restored=new PersistentPaperTradingService('recover-me',secondStore);
+  const restored=new PersistentPaperTradingService('recover-me',secondStore,
+   new PaperTradingEngine({initialBalance:100,stake:10,payoutRate:0.8,expiryCandles:2},alwaysCall));
   assert.equal(restored.getSnapshot().openTrade?.status,'OPEN');
   assert.equal(restored.getSnapshot().balance,90);
   const settled=restored.processCandle(candle(2,102,104));
