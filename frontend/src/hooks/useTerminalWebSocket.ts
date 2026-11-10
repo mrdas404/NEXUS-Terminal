@@ -16,6 +16,10 @@ export interface MarketCandle {
   symbol: string; marketType: 'LIVE'; source: 'PROVIDER_API'; timeframe: '1m';
   openTime: number; closeTime: number; open: number; high: number; low: number; close: number; volume: number;
 }
+export interface MarketCandleGap {
+  symbol:string; marketType:'LIVE'|'OTC'; source:string; timeframe:'1m';
+  fromOpenTime:number; toOpenTime:number; missingMinutes:number;
+}
 export interface MarketFeedTick {
   symbol: string;
   price: number;
@@ -42,6 +46,7 @@ export interface TerminalState {
   marketTicks: MarketFeedTick[];
   marketCandles: Record<string, MarketCandle[]>;
   closedMarketCandles: MarketCandle[];
+  marketGaps: MarketCandleGap[];
 }
 
 const WS_URL = (import.meta.env.VITE_WS_URL || 'ws://localhost:3001').replace(/^http/,'ws');
@@ -59,7 +64,7 @@ const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3001').replac
 export function useTerminalWebSocket() {
   const [state, setState] = useState<TerminalState>({
     prices: INITIAL_PRICES, signals: [], connected: false, history: INITIAL_HISTORY,
-    pnl: 0, orderBook: null, sentiment: null, marketFeed: INITIAL_FEED, marketTicks: [], marketCandles: {}, closedMarketCandles: []
+    pnl: 0, orderBook: null, sentiment: null, marketFeed: INITIAL_FEED, marketTicks: [], marketCandles: {}, closedMarketCandles: [], marketGaps: []
   });
 
   const recoverHistoricalCandles = useCallback(async (signal?: AbortSignal) => {
@@ -77,9 +82,12 @@ export function useTerminalWebSocket() {
   }, []);
 
   const connect = useCallback(() => {
+    let disposed = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+    const recoveryController = new AbortController();
     const ws = new WebSocket(WS_URL);
     ws.binaryType = 'arraybuffer';
-    ws.onopen = () => { setState(s => ({ ...s, connected: true })); void recoverHistoricalCandles(); };
+    ws.onopen = () => { if (disposed) return; setState(s => ({ ...s, connected: true })); void recoverHistoricalCandles(recoveryController.signal); };
     ws.onmessage = event => {
       try {
         const message = unpack(new Uint8Array(event.data as ArrayBuffer));
@@ -97,6 +105,11 @@ export function useTerminalWebSocket() {
           if (tick.marketType !== 'LIVE' || tick.source !== 'PROVIDER_API' ||
               !Number.isFinite(tick.price) || tick.price <= 0) return;
           setState(s => ({ ...s, marketTicks: [tick, ...s.marketTicks.filter(t => t.symbol !== tick.symbol)].slice(0,3) }));
+        } else if (message.type === 'MARKET_CANDLE_GAP') {
+          const gap = message.data as MarketCandleGap;
+          if (!gap.symbol || !Number.isInteger(gap.missingMinutes) || gap.missingMinutes < 1 || !Number.isFinite(gap.fromOpenTime) || !Number.isFinite(gap.toOpenTime)) return;
+          setState(s => ({ ...s, marketGaps: [...s.marketGaps.filter(g => !(g.symbol === gap.symbol && g.fromOpenTime === gap.fromOpenTime)), gap].slice(-100) }));
+          void recoverHistoricalCandles(recoveryController.signal);
         } else if (message.type === 'MARKET_CANDLE' || message.type === 'MARKET_CANDLE_CLOSED') {
           const candle = message.data as MarketCandle;
           if (candle.marketType !== 'LIVE' || candle.source !== 'PROVIDER_API' || candle.timeframe !== '1m' || !Number.isFinite(candle.openTime) || ![candle.open,candle.high,candle.low,candle.close,candle.volume].every(Number.isFinite) || candle.low <= 0 || candle.volume < 0 || candle.high < Math.max(candle.open,candle.close,candle.low) || candle.low > Math.min(candle.open,candle.close,candle.high)) return;
@@ -129,11 +142,13 @@ export function useTerminalWebSocket() {
       } catch (err) { console.error('[WS] Decode error:',err); }
     };
     ws.onclose = () => {
+      recoveryController.abort();
+      if (disposed) return;
       setState(s => ({...s,connected:false}));
-      setTimeout(connect,3000);
+      reconnectTimer = setTimeout(() => { if (!disposed) connect(); },3000);
     };
     ws.onerror = () => ws.close();
-    return () => ws.close();
+    return () => { disposed = true; recoveryController.abort(); if (reconnectTimer) clearTimeout(reconnectTimer); ws.close(); };
   }, [recoverHistoricalCandles]);
 
   useEffect(() => {
