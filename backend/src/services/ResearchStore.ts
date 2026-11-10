@@ -88,5 +88,15 @@ export class ResearchStore {
     return r?{sessionId:r.session_id,initialBalance:r.initial_balance,balance:r.balance,netPnl:r.net_pnl,snapshot:JSON.parse(r.snapshot_json),updatedAt:r.updated_at}:null;
   }
   public getPaperTrades(id:string):PaperTrade[]{return (this.db.prepare('SELECT trade_json FROM paper_trades WHERE session_id=? ORDER BY trade_id').all(id) as Array<{trade_json:string}>).map(r=>JSON.parse(r.trade_json) as PaperTrade);}
+  public healthCheck():{ok:boolean;integrity:string}{
+    try {
+      this.db.prepare('SELECT 1 AS ok').get();
+      const result=this.db.pragma('quick_check') as Array<{quick_check:string}>;
+      const integrity=result[0]?.quick_check ?? 'unknown';
+      return {ok:integrity==='ok',integrity};
+    } catch(error) {
+      return {ok:false,integrity:error instanceof Error?error.message:'database check failed'};
+    }
+  }
   public close(){this.db.close();}
 }
