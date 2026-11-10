@@ -162,3 +162,35 @@ test('paper session rejects changed options when restoring an existing session',
   assert.throws(()=>new PersistentPaperTradingService('options-test',store,new PaperTradingEngine({initialBalance:300})),/options do not match/);
  }finally{store.close();rmSync(p,{force:true});rmSync(p+'-wal',{force:true});rmSync(p+'-shm',{force:true});}
 });
+
+
+import { MarketDataFeedService, parseBinanceTradeMessage } from '../src/services/MarketDataFeedService';
+
+test('Binance public trade parser preserves LIVE provider provenance',()=>{
+ const tick=parseBinanceTradeMessage(JSON.stringify({stream:'btcusdt@trade',data:{e:'trade',s:'BTCUSDT',p:'65000.5',q:'0.01',T:1_700_000_040_000}}),1_700_000_040_100);
+ assert.deepEqual(tick,{symbol:'BTC/USDT',price:65000.5,volume:0.01,timestamp:1_700_000_040_000,marketType:'LIVE',source:'PROVIDER_API'});
+});
+test('Binance parser rejects unknown symbols, malformed and stale messages',()=>{
+ assert.equal(parseBinanceTradeMessage('not-json'),null);
+ assert.equal(parseBinanceTradeMessage(JSON.stringify({e:'trade',s:'UNKNOWN',p:'1',q:'1',T:1_700_000_040_000}),1_700_000_040_100),null);
+ assert.equal(parseBinanceTradeMessage(JSON.stringify({e:'trade',s:'BTCUSDT',p:'1',q:'1',T:1}),1_700_000_040_100),null);
+});
+test('market feed service refuses simulated and OTC ticks',()=>{
+ const feed=new MarketDataFeedService();
+ const base={symbol:'BTC/USDT',price:100,timestamp:1_700_000_040_000,volume:1};
+ assert.equal(feed.ingestTick({...base,marketType:'LIVE',source:'SIMULATED'}),false);
+ assert.equal(feed.ingestTick({...base,marketType:'OTC',source:'PROVIDER_API'}),false);
+ assert.equal(feed.getStatus().marketType,'LIVE');
+ feed.stop();
+});
+test('market feed service emits provenance-tagged 1-minute candles',()=>{
+ const feed=new MarketDataFeedService();
+ const candles:Candle[]=[];
+ feed.on('candle',(c:Candle)=>candles.push(c));
+ const t=1_700_000_040_000;
+ assert.equal(feed.ingestTick({symbol:'BTC/USDT',price:100,timestamp:t,marketType:'LIVE',source:'PROVIDER_API'}),true);
+ assert.equal(candles[0].marketType,'LIVE');
+ assert.equal(candles[0].source,'PROVIDER_API');
+ assert.equal(candles[0].open,100);
+ feed.stop();
+});
