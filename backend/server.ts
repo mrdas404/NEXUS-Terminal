@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import express from 'express';
+import { ADMIN_SESSION_COOKIE, createAdminSession, isAdminSessionValid, safeTextEqual } from './src/security/AdminAuth';
 import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
@@ -26,6 +27,9 @@ import './src/exchanges/Coinbase';
 import './src/exchanges/Uniswap';
 
 const app = express();
+const adminPassword = process.env.ADMIN_PASSWORD ?? '';
+const sessionSecret = process.env.SESSION_SECRET ?? '';
+if (adminPassword.length < 16 || sessionSecret.length < 32) throw new Error('ADMIN_PASSWORD (16+ chars) and SESSION_SECRET (32+ chars) are required');
 app.disable('x-powered-by');
 app.use((req, res, next) => {
   const started = Date.now();
@@ -45,9 +49,55 @@ app.use(cors({ origin: (origin, callback) => {
   return callback(new Error('Origin is not allowed by CORS'));
 }, credentials: false }));
 app.use(express.json({ limit: '2mb' }));
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+const requestIsSecure = (req: express.Request) => req.secure || req.headers['x-forwarded-proto'] === 'https';
+const requestOriginAllowed = (req: express.Request) => {
+  const origin = req.headers.origin;
+  return !origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin);
+};
+const sessionCookie = (token: string, req: express.Request) =>
+  ADMIN_SESSION_COOKIE + '=' + encodeURIComponent(token) + '; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800' + (requestIsSecure(req) ? '; Secure' : '');
+
+app.get('/api/auth/session', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ authenticated: isAdminSessionValid(req.headers.cookie, sessionSecret) });
+});
+app.post('/api/auth/login', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!requestOriginAllowed(req)) return res.status(403).json({ error: 'Origin not allowed' });
+  const ip = req.socket.remoteAddress ?? 'unknown';
+  const now = Date.now();
+  const attempt = loginAttempts.get(ip);
+  if (attempt && attempt.resetAt > now && attempt.count >= 5) {
+    res.setHeader('Retry-After', String(Math.ceil((attempt.resetAt - now) / 1000)));
+    return res.status(429).json({ error: 'Too many login attempts. Try again later.' });
+  }
+  if (!attempt || attempt.resetAt <= now) loginAttempts.set(ip, { count: 1, resetAt: now + 900000 });
+  else attempt.count += 1;
+  const supplied = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (supplied.length > 1024 || !safeTextEqual(adminPassword, supplied)) return res.status(401).json({ error: 'Invalid administrator password' });
+  loginAttempts.delete(ip);
+  res.setHeader('Set-Cookie', sessionCookie(createAdminSession(sessionSecret), req));
+  return res.json({ authenticated: true });
+});
+app.post('/api/auth/logout', (req, res) => {
+  if (!requestOriginAllowed(req)) return res.status(403).json({ error: 'Origin not allowed' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Set-Cookie', ADMIN_SESSION_COOKIE + '=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' + (requestIsSecure(req) ? '; Secure' : ''));
+  return res.json({ authenticated: false });
+});
+app.use('/api', (req, res, next) => {
+  if (!isAdminSessionValid(req.headers.cookie, sessionSecret)) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !requestOriginAllowed(req)) return res.status(403).json({ error: 'Origin not allowed' });
+  next();
+});
+
 
 const server = http.createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 1 * 1024 * 1024, perMessageDeflate: false });
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 1 * 1024 * 1024, perMessageDeflate: false, verifyClient: (info, done) => { const origin = info.origin; const originAllowed = !origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin); done(originAllowed && isAdminSessionValid(info.req.headers.cookie, sessionSecret), originAllowed ? 401 : 403, 'Authentication required'); } });
 const marketDataFeed = new MarketDataFeedService();
 const researchStore = new ResearchStore(process.env.RESEARCH_DB_PATH);
 const historicalCandles = new HistoricalCandleService(researchStore);
