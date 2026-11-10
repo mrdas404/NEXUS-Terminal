@@ -12,6 +12,11 @@ import { detectionEngine } from './src/services/DetectionEngine';
 import { db } from './src/services/Database';
 import { orderBookService } from './src/services/OrderBookService';
 import { sentimentEngine } from './src/services/SentimentEngine';
+import type { Candle, MarketDataSource, QuotexMarketType } from './src/types';
+import { ResearchStore } from './src/services/ResearchStore';
+import { HistoricalResearchService } from './src/services/HistoricalResearchService';
+import { PersistentPaperTradingService } from './src/services/PersistentPaperTradingService';
+import type { PaperTradingOptions } from './src/services/PaperTradingEngine';
 
 // Initialize exchanges
 import './src/exchanges/Binance';
@@ -20,7 +25,7 @@ import './src/exchanges/Uniswap';
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -104,6 +109,83 @@ app.post('/api/settings', (req, res) => {
 
 app.get('/api/sentiment', (req, res) => {
   res.json(sentimentEngine.getSentiment());
+});
+
+
+// ── Research / Backtest / Paper Trading API (virtual only) ──────
+const researchStore = new ResearchStore(process.env.RESEARCH_DB_PATH);
+const historicalResearch = new HistoricalResearchService(researchStore);
+const paperSessions = new Map<string, PersistentPaperTradingService>();
+const validMarket = (v: unknown): v is QuotexMarketType => v === 'LIVE' || v === 'OTC';
+const validSource = (v: unknown): v is MarketDataSource =>
+  v === 'PROVIDER_API' || v === 'QUOTEX_WEBSOCKET' || v === 'UNISWAP_RPC' || v === 'SIMULATED';
+const parseStream = (body: any) => {
+  if (!body || typeof body.symbol !== 'string' || !body.symbol.trim() ||
+      !validMarket(body.marketType) || !validSource(body.source)) {
+    throw new Error('stream must include symbol, marketType (LIVE/OTC), and source');
+  }
+  return { symbol: body.symbol.trim(), marketType: body.marketType, source: body.source };
+};
+const apiError = (res: express.Response, error: unknown) =>
+  res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid request' });
+
+app.post('/api/research/import-csv', (req, res) => {
+  try {
+    if (typeof req.body?.csv !== 'string') throw new Error('csv must be a string');
+    const result = historicalResearch.importCsv(req.body.csv, parseStream(req.body.stream));
+    res.status(201).json({ imported: result.rowsRead, firstOpenTime: result.firstOpenTime, lastOpenTime: result.lastOpenTime, stream: req.body.stream });
+  } catch (error) { apiError(res, error); }
+});
+app.post('/api/research/backtests', (req, res) => {
+  try {
+    const result = historicalResearch.runBacktest(parseStream(req.body?.stream), req.body?.options ?? {});
+    res.status(201).json(result);
+  } catch (error) { apiError(res, error); }
+});
+app.get('/api/research/backtests/:reportId', (req, res) => {
+  const report = researchStore.getBacktestReport(req.params.reportId);
+  if (!report) return res.status(404).json({ error: 'Backtest report not found' });
+  res.json({ reportId: req.params.reportId, report });
+});
+app.post('/api/paper/sessions', (req, res) => {
+  try {
+    const sessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId.trim() : '';
+    if (!sessionId || sessionId.length > 128) throw new Error('sessionId is required (max 128 characters)');
+    if (req.body?.options && typeof req.body.options !== 'object') throw new Error('options must be an object');
+    const service = new PersistentPaperTradingService(sessionId, researchStore,
+      new (require('./src/services/PaperTradingEngine').PaperTradingEngine)(req.body?.options ?? {}));
+    paperSessions.set(sessionId, service);
+    res.status(201).json({ sessionId, recovered: researchStore.getPaperCandles(sessionId).length > 0, snapshot: service.getSnapshot() });
+  } catch (error) { apiError(res, error); }
+});
+app.get('/api/paper/sessions/:sessionId', (req, res) => {
+  const session = researchStore.getPaperSession(req.params.sessionId);
+  if (!session) return res.status(404).json({ error: 'Paper session not found' });
+  res.json({ ...session, trades: researchStore.getPaperTrades(req.params.sessionId) });
+});
+app.post('/api/paper/sessions/:sessionId/candles', (req, res) => {
+  try {
+    let service = paperSessions.get(req.params.sessionId);
+    if (!service) {
+      if (!researchStore.getPaperSession(req.params.sessionId)) return res.status(404).json({ error: 'Paper session not found; create it first' });
+      service = new PersistentPaperTradingService(req.params.sessionId, researchStore);
+      paperSessions.set(req.params.sessionId, service);
+    }
+    const update = service.processCandle(req.body as Candle);
+    res.json({ update, snapshot: service.getSnapshot() });
+  } catch (error) { apiError(res, error); }
+});
+app.post('/api/paper/sessions/:sessionId/reset', (req, res) => {
+  try {
+    let service = paperSessions.get(req.params.sessionId);
+    if (!service) {
+      if (!researchStore.getPaperSession(req.params.sessionId)) return res.status(404).json({ error: 'Paper session not found' });
+      service = new PersistentPaperTradingService(req.params.sessionId, researchStore);
+      paperSessions.set(req.params.sessionId, service);
+    }
+    service.reset();
+    res.json({ sessionId: req.params.sessionId, snapshot: service.getSnapshot() });
+  } catch (error) { apiError(res, error); }
 });
 
 // ── Bootstrap (better-sqlite3 is synchronous — no async needed) ─

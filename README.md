@@ -205,3 +205,19 @@ timestamp,open,high,low,close,volume
 ```
 
 These are backend service classes, not upload endpoints or dashboard screens. From `backend/`, run `npm test` and `npm run build`.
+
+
+## Quotex Edition — Phase 3.2 API and paper-session recovery
+
+Research API endpoints (all under `/api`):
+- `POST /research/import-csv` — JSON body `{ csv, stream: { symbol, marketType, source } }`.
+- `POST /research/backtests` — JSON body `{ stream, options? }`; returns report and report ID.
+- `GET /research/backtests/:reportId` — retrieves a stored report.
+- `POST /paper/sessions` — JSON body `{ sessionId, options? }`; creates or recovers a virtual session.
+- `GET /paper/sessions/:sessionId` — returns persisted snapshot and trade history.
+- `POST /paper/sessions/:sessionId/candles` — feeds one closed candle into the virtual engine.
+- `POST /paper/sessions/:sessionId/reset` — resets the virtual session and its replay log.
+
+Paper recovery stores each processed candle and replays them in chronological order on session creation/recovery. Engine options are stored with the snapshot and checked during recovery. Candle + snapshot writes are committed in one SQLite transaction. Reset clears the replay log and trade rows. Set `RESEARCH_DB_PATH` to choose a dedicated SQLite database; otherwise the backend's existing Prisma SQLite file is used.
+
+These endpoints accept caller-provided historical/research candles. They do not connect to Quotex, fetch live market data, or place broker orders. Do not send untrusted provider data without validating its provenance.

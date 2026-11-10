@@ -127,3 +127,28 @@ test('historical research service imports and runs only the requested stream',()
   assert.equal(store.getBacktestReport(result.reportId)?.stream.marketType,'LIVE');
  }finally{store.close();rmSync(p,{force:true});rmSync(p+'-wal',{force:true});rmSync(p+'-shm',{force:true});}
 });
+
+
+test('paper session restores pending/open trade and virtual balance after store restart',()=>{
+ const p=join(tmpdir(),`nexus-recovery-${randomUUID()}.db`);
+ const firstStore=new ResearchStore(p);
+ try {
+  const engine=new PaperTradingEngine({initialBalance:100,stake:10,payoutRate:0.8,expiryCandles:2},alwaysCall);
+  const first=new PersistentPaperTradingService('recover-me',firstStore,engine);
+  first.processCandle(candle(0,100,100));
+  first.processCandle(candle(1,101,102));
+  assert.equal(first.getSnapshot().openTrade?.status,'OPEN');
+ } finally { firstStore.close(); }
+ const secondStore=new ResearchStore(p);
+ try {
+  const restored=new PersistentPaperTradingService('recover-me',secondStore);
+  assert.equal(restored.getSnapshot().openTrade?.status,'OPEN');
+  assert.equal(restored.getSnapshot().balance,90);
+  const settled=restored.processCandle(candle(2,102,104));
+  assert.equal(settled.settled?.status,'WIN');
+  assert.equal(restored.getSnapshot().balance,108);
+  restored.reset();
+  assert.equal(secondStore.getPaperCandles('recover-me').length,0);
+  assert.equal(secondStore.getPaperTrades('recover-me').length,0);
+ } finally { secondStore.close();rmSync(p,{force:true});rmSync(p+'-wal',{force:true});rmSync(p+'-shm',{force:true});}
+});

@@ -152,6 +152,10 @@ export class PaperTradingEngine {
     return entryIndex + this.options.expiryCandles - 1;
   }
 
+  public getOptions(): PaperTradingOptions {
+    return { ...this.options };
+  }
+
   public getSnapshot(): {
     balance: number;
     initialBalance: number;
@@ -162,6 +166,7 @@ export class PaperTradingEngine {
     stream: { symbol: string; marketType: Candle['marketType']; source: Candle['source'] } | null;
   } {
     return {
+      options: this.getOptions(),
       balance: this.balance,
       initialBalance: this.options.initialBalance,
       netPnl: this.trades.reduce((sum, trade) => sum + (trade.pnl ?? 0), 0),
