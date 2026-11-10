@@ -11,7 +11,7 @@ const row=(openTime:number,closeTime:number,close='101')=>[
 test('returns only complete, valid LIVE provider candles in ascending order',async()=>{
   global.fetch=async()=>new Response(JSON.stringify([
     row(now-180_000,now-120_001),
-    row(now-60_000,now+1), // still open
+    row(now-60_000,now+60_000), // still open
     row(now-120_000,now-60_001,'not-a-price')
   ]),{status:200}) as Response;
   try{
