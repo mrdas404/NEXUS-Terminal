@@ -10,9 +10,10 @@ import { OrderBookPanel } from './components/OrderBook';
 import { SentimentGauge } from './components/SentimentGauge';
 import { Activity, Radio, Settings2, Bell, BellOff, FlaskConical } from 'lucide-react';
 import { ResearchDashboard } from './components/ResearchDashboard';
+import { MarketFeedMonitor } from './components/MarketFeedMonitor';
 
 function App() {
-  const { prices, signals, connected, history, pnl, orderBook, sentiment } = useTerminalWebSocket();
+  const { prices, signals, connected, history, pnl, orderBook, sentiment, marketFeed, marketTicks } = useTerminalWebSocket();
   const { permission } = useNotifications(signals);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [activeView, setActiveView] = useState<'terminal' | 'research'>('terminal');
@@ -66,6 +67,8 @@ function App() {
       {/* Main Content Grid */}
       <main className="flex-1 p-6 flex flex-col gap-6 max-w-[1800px] w-full mx-auto overflow-hidden">
         {activeView === 'research' ? <ResearchDashboard /> : <>
+
+        <MarketFeedMonitor status={marketFeed} ticks={marketTicks} connected={connected} />
 
         {/* Top Row: Mini Charts */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
