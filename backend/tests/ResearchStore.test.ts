@@ -98,3 +98,18 @@ test('rejects non-canonical one-minute timestamps',()=>{
     assert.throws(()=>store.saveCandles([{...candle(60_001),openTime:60_001,closeTime:120_000}]),/invalid OHLC/);
   }finally{store.close();}
 });
+
+
+test('reports a healthy SQLite connection and integrity check',()=>{
+  const store=new ResearchStore(':memory:');
+  try{assert.deepEqual(store.healthCheck(),{ok:true,integrity:'ok'});}
+  finally{store.close();}
+});
+
+test('provider upsert rejects non-canonical one-minute timestamps',()=>{
+  const store=new ResearchStore(':memory:');
+  try{
+    assert.throws(()=>store.upsertCandles([{...candle(60_000),openTime:60_001,closeTime:120_000}]),/invalid OHLC/);
+    assert.equal(store.getCandles({symbol:'BTC/USDT',marketType:'LIVE',source:'PROVIDER_API'}).length,0);
+  }finally{store.close();}
+});
