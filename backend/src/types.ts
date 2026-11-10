@@ -18,6 +18,8 @@ export interface MarketTick {
   marketType: QuotexMarketType;
   source: MarketDataSource;
   volume?: number;
+  /** Provider trade/event id used for replay-safe ingestion when available. */
+  tradeId?: string | number;
 }
 
 export interface Candle {
