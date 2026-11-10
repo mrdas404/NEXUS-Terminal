@@ -8,12 +8,14 @@ import { MainChart } from './components/MainChart';
 import { SettingsPanel } from './components/SettingsPanel';
 import { OrderBookPanel } from './components/OrderBook';
 import { SentimentGauge } from './components/SentimentGauge';
-import { Activity, Radio, Settings2, Bell, BellOff } from 'lucide-react';
+import { Activity, Radio, Settings2, Bell, BellOff, FlaskConical } from 'lucide-react';
+import { ResearchDashboard } from './components/ResearchDashboard';
 
 function App() {
   const { prices, signals, connected, history, pnl, orderBook, sentiment } = useTerminalWebSocket();
   const { permission } = useNotifications(signals);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [activeView, setActiveView] = useState<'terminal' | 'research'>('terminal');
 
   return (
     <div className="min-h-screen bg-darkBg text-white flex flex-col font-terminal">
@@ -27,6 +29,8 @@ function App() {
         </div>
 
         <div className="flex items-center gap-4 text-sm font-mono">
+          <button onClick={() => setActiveView('terminal')} className={activeView === 'terminal' ? 'text-neonGreen' : 'text-gray-500 hover:text-white'}>MARKET</button>
+          <button onClick={() => setActiveView('research')} className={activeView === 'research' ? 'text-neonGreen' : 'text-gray-500 hover:text-white'}><FlaskConical size={15} className="inline mr-1"/>RESEARCH</button>
           {/* Sentiment Gauge */}
           <SentimentGauge sentiment={sentiment} />
 
@@ -61,6 +65,7 @@ function App() {
 
       {/* Main Content Grid */}
       <main className="flex-1 p-6 flex flex-col gap-6 max-w-[1800px] w-full mx-auto overflow-hidden">
+        {activeView === 'research' ? <ResearchDashboard /> : <>
 
         {/* Top Row: Mini Charts */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
@@ -88,6 +93,7 @@ function App() {
             <SignalsFeed signals={signals} />
           </div>
         </div>
+        </>}
       </main>
 
       {isSettingsOpen && <SettingsPanel onClose={() => setIsSettingsOpen(false)} />}
