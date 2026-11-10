@@ -110,6 +110,7 @@ export class MarketDataFeedService extends EventEmitter {
     this.emit('tick', tick);
     this.emit('candle', result.candle);
     if (result.closedCandle) this.emit('closed_candle', result.closedCandle);
+    if (result.gap) this.emit('candle_gap', { symbol: tick.symbol, marketType: tick.marketType, source: tick.source, timeframe: '1m', ...result.gap });
     return true;
   }
 
