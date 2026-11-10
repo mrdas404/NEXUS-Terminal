@@ -31,7 +31,7 @@ services:
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
     read_only: true
-    tmpfs: [/var/cache/nginx:size=16m, /var/run:size=4m, /tmp:size=8m,noexec,nosuid]
+    tmpfs: [/var/cache/nginx:size=16m,uid=101,gid=101, /var/run:size=4m,uid=101,gid=101, /tmp:size=8m,noexec,nosuid]
     healthcheck:
       test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/]
       interval: 30s
