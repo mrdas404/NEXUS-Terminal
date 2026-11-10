@@ -279,12 +279,14 @@ const shutdown = (signal: string) => {
   clearInterval(heartbeatTimer);
   for (const client of clients) client.close(1001, 'Server shutting down');
   wss.close();
+  const forceExitTimer = setTimeout(() => process.exit(1), 10_000);
+  forceExitTimer.unref();
   server.close(() => {
+    clearTimeout(forceExitTimer);
     researchStore.close();
     db.close();
     process.exit(0);
   });
-  setTimeout(() => process.exit(1), 10_000).unref();
 };
 process.once('SIGTERM', () => shutdown('SIGTERM'));
 process.once('SIGINT', () => shutdown('SIGINT'));
