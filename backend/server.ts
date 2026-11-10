@@ -48,7 +48,7 @@ if (allowedOrigins.includes('*')) throw new Error('Wildcard CORS origins are not
 app.use(cors({ origin: (origin, callback) => {
   if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) return callback(null, true);
   return callback(new Error('Origin is not allowed by CORS'));
-}, credentials: false }));
+}, credentials: true }));
 app.use(express.json({ limit: '2mb' }));
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 const requestIsSecure = (req: express.Request) => req.secure || req.headers['x-forwarded-proto'] === 'https';
@@ -57,7 +57,7 @@ const requestOriginAllowed = (req: express.Request) => {
   return typeof origin === 'string' && allowedOrigins.includes(origin);
 };
 const sessionCookie = (token: string, req: express.Request) =>
-  ADMIN_SESSION_COOKIE + '=' + encodeURIComponent(token) + '; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800' + (requestIsSecure(req) ? '; Secure' : '');
+  ADMIN_SESSION_COOKIE + '=' + encodeURIComponent(token) + '; Path=/; HttpOnly; SameSite=' + (requestIsSecure(req) ? 'None' : 'Strict') + '; Max-Age=28800' + (requestIsSecure(req) ? '; Secure' : '');
 
 app.get('/api/auth/session', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -88,7 +88,7 @@ app.post('/api/auth/login', (req, res) => {
 app.post('/api/auth/logout', (req, res) => {
   if (!requestOriginAllowed(req)) return res.status(403).json({ error: 'Origin not allowed' });
   res.setHeader('Cache-Control', 'no-store');
-  res.setHeader('Set-Cookie', ADMIN_SESSION_COOKIE + '=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0' + (requestIsSecure(req) ? '; Secure' : ''));
+  res.setHeader('Set-Cookie', ADMIN_SESSION_COOKIE + '=; Path=/; HttpOnly; SameSite=' + (requestIsSecure(req) ? 'None' : 'Strict') + '; Max-Age=0' + (requestIsSecure(req) ? '; Secure' : ''));
   return res.json({ authenticated: false });
 });
 app.use('/api', (req, res, next) => {
