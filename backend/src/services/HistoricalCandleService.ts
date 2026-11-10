@@ -1,4 +1,5 @@
 import type { Candle } from '../types';
+import { ResearchStore } from './ResearchStore';
 
 const SYMBOLS: Record<string,string> = {
   'BTC/USDT':'BTCUSDT','ETH/USDT':'ETHUSDT','SOL/USDT':'SOLUSDT'
@@ -19,11 +20,13 @@ export interface HistoricalCandleResult {
 
 /** Read-only public market history. Only fully closed spot candles are returned. */
 export class HistoricalCandleService {
+  constructor(private readonly store?:ResearchStore) {}
   async getOneMinuteCandles(symbol:string,limit=300,endTime?:number):Promise<HistoricalCandleResult>{
     const providerSymbol=SYMBOLS[symbol];
     if(!providerSymbol)throw new Error('Unsupported symbol; use BTC/USDT, ETH/USDT or SOL/USDT');
     if(!Number.isInteger(limit)||limit<1||limit>300)throw new Error('limit must be an integer from 1 to 300');
     if(endTime!==undefined&&(!Number.isFinite(endTime)||endTime<=0))throw new Error('endTime must be a positive Unix millisecond timestamp');
+    const cached=this.store?.getRecentCandles({symbol,marketType:'LIVE',source:'PROVIDER_API',timeframe:'1m',limit});
     const params=new URLSearchParams({symbol:providerSymbol,interval:'1m',limit:String(limit)});
     if(endTime!==undefined)params.set('endTime',String(Math.floor(endTime)));
     const response=await fetch(BINANCE+'?'+params.toString(),{headers:{'Accept':'application/json'},signal:AbortSignal.timeout(10_000)});
@@ -42,6 +45,11 @@ export class HistoricalCandleService {
       candles.push({symbol,marketType:'LIVE',source:'PROVIDER_API',timeframe:'1m',openTime:ot,closeTime:ct,open:o,high:h,low:l,close:c,volume:v});
     }
     candles.sort((a,b)=>a.openTime-b.openTime);
-    return {provider:'Binance Spot REST',marketType:'LIVE',source:'PROVIDER_API',timeframe:'1m',symbol,candles,count:candles.length,requestedLimit:limit,completeOnly:true};
+    if(this.store&&candles.length)this.store.saveCandles(candles);
+    const merged=new Map<number,Candle>();
+    for(const candle of cached??[])merged.set(candle.openTime,candle);
+    for(const candle of candles)merged.set(candle.openTime,candle);
+    const persisted=[...merged.values()].sort((a,b)=>a.openTime-b.openTime).slice(-limit);
+    return {provider:'Binance Spot REST',marketType:'LIVE',source:'PROVIDER_API',timeframe:'1m',symbol,candles:persisted,count:persisted.length,requestedLimit:limit,completeOnly:true};
   }
 }
