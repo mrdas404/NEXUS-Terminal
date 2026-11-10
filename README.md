@@ -186,3 +186,22 @@ A GitHub Actions workflow runs the backend test and TypeScript build checks on p
 ### Limitations and risk
 
 The backtester and paper trader are not evidence of a profitable strategy. A high historical win rate can be caused by overfitting, small samples or unrealistic payout assumptions. Use out-of-sample data, realistic provider-specific OTC/LIVE candles and a sufficiently large sample. Signal confidence remains a rule-alignment score, not a probability. No real-money automation is included.
+
+
+## Quotex Edition — Phase 3.1 historical import and persistence
+
+- `HistoricalCsvImporter` accepts `timestamp` or `openTime`, plus `open,high,low,close` and optional `volume`. Numeric timestamps in seconds or milliseconds and ISO timestamps are supported; timestamps must align to a 1-minute boundary.
+- The caller explicitly supplies `symbol`, `marketType` and `source`; these are not guessed from CSV. LIVE, OTC and provider streams stay separate.
+- `HistoricalResearchService` imports validated candles and runs backtests against the selected stored stream, saving each report with a unique ID.
+- `ResearchStore` stores candles, backtest reports, paper session snapshots and virtual trade history in SQLite. Duplicate candle timestamps are rejected transactionally.
+- `PersistentPaperTradingService` saves a snapshot after every closed candle. The paper engine remains in-memory: saved sessions are durable history/audit records but are not yet resumable after a server restart. Resume/recovery and HTTP/dashboard integration remain future work.
+
+CSV format:
+
+```csv
+timestamp,open,high,low,close,volume
+1700000040000,100,103,99,102,12
+1700000100000,102,104,101,103,8
+```
+
+These are backend service classes, not upload endpoints or dashboard screens. From `backend/`, run `npm test` and `npm run build`.

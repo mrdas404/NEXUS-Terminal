@@ -78,3 +78,52 @@ test('paper trade expiry time reflects the configured number of candles', () => 
   const settled = engine.processCandle(candle(2, 102, 104));
   assert.equal(settled.settled?.status, 'WIN');
 });
+
+
+import { HistoricalCsvImporter } from '../src/services/HistoricalCsvImporter';
+import { ResearchStore } from '../src/services/ResearchStore';
+import { HistoricalResearchService } from '../src/services/HistoricalResearchService';
+import { PersistentPaperTradingService } from '../src/services/PersistentPaperTradingService';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { rmSync } from 'node:fs';
+
+test('CSV import tags selected market/source and supports seconds timestamps',()=>{
+ const result=new HistoricalCsvImporter().parse('timestamp,open,high,low,close,volume\n1700000040,100,103,99,102,12',{symbol:'BTC/USDT',marketType:'OTC',source:'PROVIDER_API'});
+ assert.equal(result.rowsRead,1);assert.equal(result.candles[0].openTime,1700000040000);assert.equal(result.candles[0].marketType,'OTC');
+});
+test('CSV importer rejects duplicate timestamps and invalid OHLC',()=>{
+ const imp=new HistoricalCsvImporter(),opts={symbol:'BTC/USDT',marketType:'LIVE' as const,source:'PROVIDER_API' as const};
+ assert.throws(()=>imp.parse('timestamp,open,high,low,close\n1700000040000,100,101,99,100\n1700000040000,100,101,99,100',opts),/strictly chronological/);
+ assert.throws(()=>imp.parse('timestamp,open,high,low,close\n1700000040000,100,99,101,100',opts),/outside valid ranges/);
+});
+test('research store isolates streams and persists backtest reports',()=>{
+ const p=join(tmpdir(),`nexus-research-${randomUUID()}.db`),store=new ResearchStore(p);
+ try{
+  const candles=[candle(0,100,101),candle(1,101,102),candle(2,102,103)];
+  store.saveCandles(candles);assert.equal(store.getCandles({symbol:'BTC/USDT',marketType:'LIVE',source:'PROVIDER_API'}).length,3);
+  assert.equal(store.getCandles({symbol:'BTC/USDT',marketType:'OTC',source:'PROVIDER_API'}).length,0);
+  const report=new HistoricalBacktestingEngine({},alwaysCall).run(candles);store.saveBacktestReport(report,'test-report');
+  assert.equal(store.getBacktestReport('test-report')?.totalTrades,report.totalTrades);
+  assert.throws(()=>store.saveCandles(candles),/UNIQUE constraint/);
+ }finally{store.close();rmSync(p,{force:true});rmSync(p+'-wal',{force:true});rmSync(p+'-shm',{force:true});}
+});
+test('persistent paper service saves virtual balance and trade history',()=>{
+ const p=join(tmpdir(),`nexus-paper-${randomUUID()}.db`),store=new ResearchStore(p);
+ try{
+  const engine=new PaperTradingEngine({initialBalance:100,stake:10,payoutRate:0.8,expiryCandles:1},alwaysCall);
+  const service=new PersistentPaperTradingService('paper-test',store,engine);
+  service.processCandle(candle(0,100,100));service.processCandle(candle(1,101,103));
+  assert.equal(store.getPaperSession('paper-test')?.balance,108);assert.equal(store.getPaperTrades('paper-test')[0].status,'WIN');
+ }finally{store.close();rmSync(p,{force:true});rmSync(p+'-wal',{force:true});rmSync(p+'-shm',{force:true});}
+});
+test('historical research service imports and runs only the requested stream',()=>{
+ const p=join(tmpdir(),`nexus-run-${randomUUID()}.db`),store=new ResearchStore(p);
+ try{
+  const service=new HistoricalResearchService(store);
+  service.importCsv('timestamp,open,high,low,close\n1700000040000,100,101,99,100\n1700000100000,100,102,99,101\n1700000160000,101,103,100,102',{symbol:'BTC/USDT',marketType:'LIVE',source:'PROVIDER_API'});
+  const result=service.runBacktest({symbol:'BTC/USDT',marketType:'LIVE',source:'PROVIDER_API'});
+  assert.equal(store.getBacktestReport(result.reportId)?.stream.marketType,'LIVE');
+ }finally{store.close();rmSync(p,{force:true});rmSync(p+'-wal',{force:true});rmSync(p+'-shm',{force:true});}
+});
