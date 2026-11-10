@@ -5,6 +5,7 @@ import { ResearchStore } from '../src/services/ResearchStore';
 
 const originalFetch=global.fetch;
 const now=Date.now();
+const cachedOpenTime=Math.floor((now-120_000)/60_000)*60_000;
 const row=(openTime:number,closeTime:number,close='101')=>[
   openTime,'100','105','98',close,'12.5',closeTime,'0','0','0','0','0'
 ];
@@ -42,7 +43,7 @@ test('surfaces provider HTTP failures',async()=>{
 
 test('falls back to persisted LIVE candles when provider is unavailable',async()=>{
   const store=new ResearchStore(':memory:');
-  const cached={symbol:'BTC/USDT',marketType:'LIVE' as const,source:'PROVIDER_API' as const,timeframe:'1m' as const,openTime:now-120_000,closeTime:now-60_001,open:100,high:105,low:98,close:101,volume:12.5};
+  const cached={symbol:'BTC/USDT',marketType:'LIVE' as const,source:'PROVIDER_API' as const,timeframe:'1m' as const,openTime:cachedOpenTime,closeTime:cachedOpenTime+59_999,open:100,high:105,low:98,close:101,volume:12.5};
   store.saveCandles([cached]);
   global.fetch=async()=>new Response('unavailable',{status:503}) as Response;
   try{
