@@ -21,7 +21,7 @@ services:
       - key: RESEARCH_DB_PATH
         value: /data/research.sqlite
       - key: BACKUP_DIR
-        value: /backups
+        value: /data/backups
       - key: BACKUP_RETENTION_DAYS
         value: "14"
       - key: ADMIN_PASSWORD
