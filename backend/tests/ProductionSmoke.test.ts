@@ -51,7 +51,7 @@ test('production server smoke: health, readiness, MessagePack WebSocket and grac
     assert.equal(ready.status,200);
     assert.equal((await ready.json() as {ready:boolean}).ready,true);
 
-    socket=new WebSocket('ws://127.0.0.1:'+port);
+    socket=new WebSocket('ws://127.0.0.1:'+port+'/ws');
     const [data]=await once(socket,'message') as [Buffer];
     const initial=unpack(data) as {type:string;data:{marketFeed:{marketType:string;source:string}}};
     assert.equal(initial.type,'INIT_STATE');
