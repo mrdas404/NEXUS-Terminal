@@ -12,6 +12,10 @@ export interface MarketFeedStatus {
   reconnectAttempt: number;
   lastError: string|null;
 }
+export interface MarketCandle {
+  symbol: string; marketType: 'LIVE'; source: 'PROVIDER_API'; timeframe: '1m';
+  openTime: number; closeTime: number; open: number; high: number; low: number; close: number; volume: number;
+}
 export interface MarketFeedTick {
   symbol: string;
   price: number;
@@ -36,6 +40,8 @@ export interface TerminalState {
   sentiment: SentimentData | null;
   marketFeed: MarketFeedStatus;
   marketTicks: MarketFeedTick[];
+  marketCandles: Record<string, MarketCandle[]>;
+  closedMarketCandles: MarketCandle[];
 }
 
 const WS_URL = (import.meta.env.VITE_WS_URL || 'ws://localhost:3001').replace(/^http/,'ws');
@@ -52,7 +58,7 @@ const MAX_HISTORY_POINTS = 60;
 export function useTerminalWebSocket() {
   const [state, setState] = useState<TerminalState>({
     prices: INITIAL_PRICES, signals: [], connected: false, history: INITIAL_HISTORY,
-    pnl: 0, orderBook: null, sentiment: null, marketFeed: INITIAL_FEED, marketTicks: []
+    pnl: 0, orderBook: null, sentiment: null, marketFeed: INITIAL_FEED, marketTicks: [], marketCandles: {}, closedMarketCandles: []
   });
 
   const connect = useCallback(() => {
@@ -76,6 +82,15 @@ export function useTerminalWebSocket() {
           if (tick.marketType !== 'LIVE' || tick.source !== 'PROVIDER_API' ||
               !Number.isFinite(tick.price) || tick.price <= 0) return;
           setState(s => ({ ...s, marketTicks: [tick, ...s.marketTicks.filter(t => t.symbol !== tick.symbol)].slice(0,3) }));
+        } else if (message.type === 'MARKET_CANDLE' || message.type === 'MARKET_CANDLE_CLOSED') {
+          const candle = message.data as MarketCandle;
+          if (candle.marketType !== 'LIVE' || candle.source !== 'PROVIDER_API' || candle.timeframe !== '1m' || !Number.isFinite(candle.openTime) || ![candle.open,candle.high,candle.low,candle.close,candle.volume].every(Number.isFinite) || candle.low <= 0 || candle.volume < 0 || candle.high < Math.max(candle.open,candle.close,candle.low) || candle.low > Math.min(candle.open,candle.close,candle.high)) return;
+          setState(s => {
+            const prior = s.marketCandles[candle.symbol] || [];
+            const next = [...prior.filter(item => item.openTime !== candle.openTime), candle].sort((a,b)=>a.openTime-b.openTime).slice(-300);
+            const closed = message.type === 'MARKET_CANDLE_CLOSED' ? [...s.closedMarketCandles.filter(item => !(item.symbol === candle.symbol && item.openTime === candle.openTime)), candle].sort((a,b)=>a.closeTime-b.closeTime).slice(-300) : s.closedMarketCandles;
+            return { ...s, marketCandles: { ...s.marketCandles, [candle.symbol]: next }, closedMarketCandles: closed };
+          });
         } else if (message.type === 'PNL_UPDATE') {
           setState(s => ({ ...s, pnl: message.data }));
         } else if (message.type === 'ORDERBOOK_UPDATE') {
