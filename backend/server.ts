@@ -27,6 +27,11 @@ import './src/exchanges/Uniswap';
 
 const app = express();
 app.disable('x-powered-by');
+app.use((req, res, next) => {
+  const started = Date.now();
+  res.on('finish', () => console.log(JSON.stringify({ level: 'info', event: 'http_request', method: req.method, path: req.path, status: res.statusCode, durationMs: Date.now() - started })));
+  next();
+});
 app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'no-referrer');
