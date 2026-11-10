@@ -122,3 +122,30 @@ This fork is being prepared for **read-only market analysis and paper testing** 
 
 ### Important limitations
 No Quotex feed or third-party provider is configured in this phase. A source must be connected and validated before its data can be described as live. OTC prices must come from an OTC-capable source; LIVE prices must never be substituted for OTC. Do not commit Quotex passwords, session cookies, SSIDs or other account tokens to this repository. Validate signals with historical/replay data and paper trading before considering any real-money use.
+
+
+## Quotex Edition — Phase 2 indicator and signal foundation
+
+Phase 2 adds deterministic, read-only technical analysis utilities. These functions consume chronologically ordered 1-minute candles from one symbol, market type and source stream.
+
+### Indicator calculations
+- RSI (14), using Wilder smoothing.
+- EMA (9, 21, 50).
+- MACD (12, 26, 9).
+- Bollinger Bands (20, 2 standard deviations).
+- Stochastic RSI (14, 14, 3, 3).
+
+### Multi-confirmation signal engine
+- Evaluates five independent rule groups and returns `CALL`, `PUT` or `WAIT`.
+- Default minimum: three aligned confirmations.
+- Returns the contributing reasons, indicator snapshot, market type and data source.
+- Confidence is the percentage of aligned rule groups (20-point increments), **not a calibrated probability** and not a guarantee of future performance.
+- Rejects mixed symbol, timeframe, market-type or source candle sequences.
+- Does not place orders or connect to a Quotex account.
+
+### Phase 2 files
+- `backend/src/services/TechnicalIndicators.ts`: reusable indicator calculations.
+- `backend/src/services/MultiConfirmationSignalEngine.ts`: rule-based CALL/PUT/WAIT evaluation.
+
+### Validation
+Run `npm install` and then `npm run build` from `backend/` to run the strict TypeScript compiler check. No test runner is configured yet; historical-data backtesting and paper-trading execution remain follow-up work. Do not interpret the confidence score as a win probability or use unvalidated signals for real-money trades.
