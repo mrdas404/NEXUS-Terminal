@@ -7,7 +7,9 @@ const SYMBOLS: Record<string,string> = {
 const BINANCE='https://api.binance.com/api/v3/klines';
 
 export interface HistoricalCandleResult {
-  provider:'Binance Spot REST';
+  provider:string;
+  cacheUsed:boolean;
+  providerError?:string;
   marketType:'LIVE';
   source:'PROVIDER_API';
   timeframe:'1m';
@@ -29,13 +31,20 @@ export class HistoricalCandleService {
     const cached=this.store?.getRecentCandles({symbol,marketType:'LIVE',source:'PROVIDER_API',timeframe:'1m',limit});
     const params=new URLSearchParams({symbol:providerSymbol,interval:'1m',limit:String(limit)});
     if(endTime!==undefined)params.set('endTime',String(Math.floor(endTime)));
-    const response=await fetch(BINANCE+'?'+params.toString(),{headers:{'Accept':'application/json'},signal:AbortSignal.timeout(10_000)});
-    if(!response.ok)throw new Error('Binance historical API returned HTTP '+response.status);
-    const payload:unknown=await response.json();
-    if(!Array.isArray(payload))throw new Error('Binance returned an invalid candle payload');
+    let providerError:string|undefined;
+    let payload:unknown=[];
+    try {
+      const response=await fetch(BINANCE+'?'+params.toString(),{headers:{'Accept':'application/json'},signal:AbortSignal.timeout(10_000)});
+      if(!response.ok)throw new Error('Binance historical API returned HTTP '+response.status);
+      payload=await response.json();
+      if(!Array.isArray(payload))throw new Error('Binance returned an invalid candle payload');
+    } catch(error) {
+      providerError=error instanceof Error?error.message:'Binance historical API unavailable';
+      if(!cached?.length)throw error;
+    }
     const now=Date.now();
     const candles:Candle[]=[];
-    for(const row of payload){
+    for(const row of payload as unknown[]){
       if(!Array.isArray(row)||row.length<6)continue;
       const [openTime,open,high,low,close,volume,closeTime]=row;
       const values=[Number(openTime),Number(open),Number(high),Number(low),Number(close),Number(volume),Number(closeTime)];
@@ -50,6 +59,6 @@ export class HistoricalCandleService {
     for(const candle of cached??[])merged.set(candle.openTime,candle);
     for(const candle of candles)merged.set(candle.openTime,candle);
     const persisted=[...merged.values()].sort((a,b)=>a.openTime-b.openTime).slice(-limit);
-    return {provider:'Binance Spot REST',marketType:'LIVE',source:'PROVIDER_API',timeframe:'1m',symbol,candles:persisted,count:persisted.length,requestedLimit:limit,completeOnly:true};
+    return {provider:providerError?'SQLite archive (Binance Spot origin)':'Binance Spot REST',cacheUsed:Boolean(providerError),...(providerError?{providerError}:{}),marketType:'LIVE',source:'PROVIDER_API',timeframe:'1m',symbol,candles:persisted,count:persisted.length,requestedLimit:limit,completeOnly:true};
   }
 }
