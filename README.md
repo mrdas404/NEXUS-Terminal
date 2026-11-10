@@ -294,3 +294,20 @@ The optional paper bridge is deliberately manual: the user must create/recover a
 - SQLite candle writes validate canonical one-minute boundaries and OHLCV values. Strict CSV imports retain duplicate rejection; provider history uses a separate transactional upsert method.
 - Added integrity tests for event parsing, duplicate ingestion, out-of-order ticks, gap detection, stream isolation, transactional rollback, strict-import vs upsert behavior, SQLite close/reopen recovery, and persistent paper-session replay.
 - These checks do not make Binance Spot equivalent to Quotex LIVE/OTC quotes. No synthetic candles are created to fill gaps, and no real-money orders are sent.
+
+
+## Phase 5.7 — Production readiness hardening
+
+- Added `/health` for process liveness and `/ready` for SQLite connectivity plus research database `quick_check` integrity.
+- Added configurable browser CORS allowlist via `CORS_ORIGINS`; request JSON body limit reduced to 2 MB.
+- WebSocket server now caps incoming payloads at 1 MB, disables per-message compression, sends 30-second heartbeat pings, and drops clients whose outbound buffer exceeds 1 MB.
+- Added SIGINT/SIGTERM graceful shutdown: stop market feed, close WebSocket clients/server, and close SQLite handles, with a bounded shutdown timeout.
+- Core and research SQLite paths can be configured independently and parent directories are created before opening the database. Keep these paths on persistent writable storage in deployment.
+- Provider upsert now enforces the same canonical one-minute timestamp and OHLCV validation as strict imports.
+- Added readiness and provider-upsert integrity tests plus `backend/.env.example`.
+- CI validates backend tests and TypeScript build; frontend CI validates its production build. These checks are not a substitute for deployment-specific browser, reverse-proxy, TLS, real network and long-duration soak testing.
+- Binance public Spot remains LIVE crypto reference data only, not Quotex LIVE/OTC account data. The system remains read-only with virtual paper trading only.
+
+### Production configuration
+
+Copy `backend/.env.example` to `backend/.env`, set an explicit `CORS_ORIGINS` list for the deployed frontend origin, and configure `CORE_DB_PATH` and `RESEARCH_DB_PATH` to persistent writable paths. Do not commit secrets or session credentials. Put the backend behind HTTPS/WSS at the deployment proxy and configure `VITE_API_URL` / `VITE_WS_URL` for the frontend build.
