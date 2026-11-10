@@ -23,7 +23,7 @@ export class CandleBuilder {
       !tick.symbol ||
       !Number.isFinite(tick.price) ||
       tick.price <= 0 ||
-      !Number.isFinite(tick.timestamp) ||
+      !Number.isSafeInteger(tick.timestamp) ||
       (tick.volume !== undefined && (!Number.isFinite(tick.volume) || tick.volume < 0))
     ) {
       return null;
