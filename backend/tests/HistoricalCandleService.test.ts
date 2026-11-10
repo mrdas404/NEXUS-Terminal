@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { HistoricalCandleService } from '../src/services/HistoricalCandleService';
+import { ResearchStore } from '../src/services/ResearchStore';
 
 const originalFetch=global.fetch;
 const now=Date.now();
@@ -36,4 +37,18 @@ test('surfaces provider HTTP failures',async()=>{
   global.fetch=async()=>new Response('unavailable',{status:503}) as Response;
   try{await assert.rejects(()=>new HistoricalCandleService().getOneMinuteCandles('ETH/USDT'),/HTTP 503/);}
   finally{global.fetch=originalFetch;}
+});
+
+
+test('falls back to persisted LIVE candles when provider is unavailable',async()=>{
+  const store=new ResearchStore(':memory:');
+  const cached={symbol:'BTC/USDT',marketType:'LIVE' as const,source:'PROVIDER_API' as const,timeframe:'1m' as const,openTime:now-120_000,closeTime:now-60_001,open:100,high:105,low:98,close:101,volume:12.5};
+  store.saveCandles([cached]);
+  global.fetch=async()=>new Response('unavailable',{status:503}) as Response;
+  try{
+    const result=await new HistoricalCandleService(store).getOneMinuteCandles('BTC/USDT',3);
+    assert.equal(result.cacheUsed,true);
+    assert.equal(result.count,1);
+    assert.equal(result.candles[0].openTime,cached.openTime);
+  }finally{global.fetch=originalFetch;store.close();}
 });
