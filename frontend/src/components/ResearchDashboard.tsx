@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { apiUrl } from '../lib/api';
 import { FileUp, FlaskConical, Play, RefreshCw, RotateCcw, ShieldCheck } from 'lucide-react';
 
 type Market = 'LIVE'|'OTC';
@@ -7,7 +8,6 @@ type Stream = {symbol:string;marketType:Market;source:Source};
 type Trade = {id:number;direction:'CALL'|'PUT';status?:'OPEN'|'WIN'|'LOSS'|'TIE';outcome?:'WIN'|'LOSS'|'TIE';entryPrice:number;exitPrice?:number;pnl?:number;entryTime:number};
 type Report = {totalTrades:number;wins:number;losses:number;ties:number;winRate:number;netPnl:number;endingBalance:number;returnPercent:number;maxDrawdown:number;maxDrawdownPercent:number;profitFactor:number|null;stream:Stream;trades:Trade[]};
 type Snapshot = {balance:number;initialBalance:number;netPnl:number;pendingDirection:string|null;trades:Trade[];stream:Stream|null};
-const API=(import.meta.env.VITE_API_URL||'http://localhost:3001').replace(/\/$/,'');
 const field='mt-1 w-full rounded border border-darkBorder bg-[#0b0e14] px-3 py-2 text-sm text-white';
 const panel='rounded-lg border border-darkBorder bg-darkSurface p-4';
 const cash=(v:number)=> (v<0?'-':'')+'$'+Math.abs(v).toFixed(2);
@@ -22,7 +22,7 @@ export function ResearchDashboard(){
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');
  const options={initialBalance:Number(balance),stake:Number(stake),payoutRate:Number(payout),expiryCandles:Number(expiry)};
  async function api<T>(path:string,body?:unknown):Promise<T>{
-  const response=await fetch(API+path,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
+  const response=await fetch(apiUrl(path),{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),credentials:'include'});
   const data=await response.json().catch(()=>({error:'Unreadable server response'}));
   if(!response.ok)throw new Error(data.error||'Request failed: '+response.status);
   return data as T;
