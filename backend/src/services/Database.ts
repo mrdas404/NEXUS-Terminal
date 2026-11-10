@@ -1,8 +1,10 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import fs from 'node:fs';
 import type { Signal } from '../types';
 
-const DB_PATH = path.join(__dirname, '../../prisma/dev.db');
+const DB_PATH = process.env.CORE_DB_PATH || process.env.RESEARCH_DB_PATH || path.resolve(process.cwd(), 'prisma/dev.db');
+if (DB_PATH !== ':memory:') fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 
 export class DatabaseService {
   private db: Database.Database;
