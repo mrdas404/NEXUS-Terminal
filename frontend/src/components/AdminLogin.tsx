@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Activity, LockKeyhole } from 'lucide-react';
+import { apiUrl } from '../lib/api';
 
 interface AdminLoginProps { onAuthenticated: () => void; }
 
@@ -11,9 +12,9 @@ export function AdminLogin({ onAuthenticated }: AdminLoginProps) {
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setError(''); setBusy(true);
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(apiUrl('/api/auth/login'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin', body: JSON.stringify({ password }),
+        credentials: 'include', body: JSON.stringify({ password }),
       });
       if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(body.error || 'Login failed'); }
       setPassword(''); onAuthenticated();
