@@ -33,11 +33,20 @@ export class ResearchStore {
   `);}
   public saveCandles(candles:Candle[]):number {
     if(!candles.length)return 0; const first=candles[0];
-    const insert=this.db.prepare('INSERT INTO research_candles(symbol,market_type,source,timeframe,open_time,close_time,open,high,low,close,volume) VALUES(@symbol,@marketType,@source,@timeframe,@openTime,@closeTime,@open,@high,@low,@close,@volume) ON CONFLICT(symbol,market_type,source,timeframe,open_time) DO UPDATE SET close_time=excluded.close_time,open=excluded.open,high=excluded.high,low=excluded.low,close=excluded.close,volume=excluded.volume');
+    const insert=this.db.prepare('INSERT INTO research_candles(symbol,market_type,source,timeframe,open_time,close_time,open,high,low,close,volume) VALUES(@symbol,@marketType,@source,@timeframe,@openTime,@closeTime,@open,@high,@low,@close,@volume)');
     this.db.transaction((items:Candle[])=>{for(const c of items){
       if(c.symbol!==first.symbol||c.marketType!==first.marketType||c.source!==first.source||c.timeframe!=='1m')throw new Error('Cannot persist mixed candle streams in one import');
       if(!Number.isFinite(c.openTime)||!Number.isFinite(c.closeTime)||c.closeTime<=c.openTime||![c.open,c.high,c.low,c.close,c.volume].every(Number.isFinite)||c.low<=0||c.volume<0||c.high<Math.max(c.open,c.close,c.low)||c.low>Math.min(c.open,c.close,c.high))throw new Error('Cannot persist an invalid OHLC candle');
       insert.run({symbol:c.symbol,marketType:c.marketType,source:c.source,timeframe:c.timeframe,openTime:c.openTime,closeTime:c.closeTime,open:c.open,high:c.high,low:c.low,close:c.close,volume:c.volume});
+    }})(candles); return candles.length;
+  }
+  public upsertCandles(candles:Candle[]):number {
+    if(!candles.length)return 0; const first=candles[0];
+    const upsert=this.db.prepare('INSERT INTO research_candles(symbol,market_type,source,timeframe,open_time,close_time,open,high,low,close,volume) VALUES(@symbol,@marketType,@source,@timeframe,@openTime,@closeTime,@open,@high,@low,@close,@volume) ON CONFLICT(symbol,market_type,source,timeframe,open_time) DO UPDATE SET close_time=excluded.close_time,open=excluded.open,high=excluded.high,low=excluded.low,close=excluded.close,volume=excluded.volume');
+    this.db.transaction((items:Candle[])=>{for(const c of items){
+      if(c.symbol!==first.symbol||c.marketType!==first.marketType||c.source!==first.source||c.timeframe!=='1m')throw new Error('Cannot persist mixed candle streams in one import');
+      if(!Number.isFinite(c.openTime)||!Number.isFinite(c.closeTime)||c.closeTime<=c.openTime||![c.open,c.high,c.low,c.close,c.volume].every(Number.isFinite)||c.low<=0||c.volume<0||c.high<Math.max(c.open,c.close,c.low)||c.low>Math.min(c.open,c.close,c.high))throw new Error('Cannot persist an invalid OHLC candle');
+      upsert.run({symbol:c.symbol,marketType:c.marketType,source:c.source,timeframe:c.timeframe,openTime:c.openTime,closeTime:c.closeTime,open:c.open,high:c.high,low:c.low,close:c.close,volume:c.volume});
     }})(candles); return candles.length;
   }
   public getRecentCandles(s:{symbol:string;marketType:Candle['marketType'];source:Candle['source'];timeframe?:Candle['timeframe'];limit?:number}):Candle[]{
