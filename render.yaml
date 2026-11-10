@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: nexus-terminal-backend
+    runtime: docker
+    plan: starter
+    region: singapore
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /ready
+    numInstances: 1
+    autoDeploy: true
+    disk:
+      name: nexus-terminal-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CORE_DB_PATH
+        value: /data/core.sqlite
+      - key: RESEARCH_DB_PATH
+        value: /data/research.sqlite
+      - key: BACKUP_DIR
+        value: /backups
+      - key: BACKUP_RETENTION_DAYS
+        value: "14"
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        sync: false
