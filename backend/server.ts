@@ -287,6 +287,8 @@ const shutdown = (signal: string) => {
     db.close();
     process.exit(0);
   });
+  // Close idle HTTP keep-alive sockets so shutdown cannot wait indefinitely.
+  server.closeAllConnections();
 };
 process.once('SIGTERM', () => shutdown('SIGTERM'));
 process.once('SIGINT', () => shutdown('SIGINT'));
