@@ -39,6 +39,9 @@ test('production server smoke: health, readiness, MessagePack WebSocket and grac
     stdio:['ignore','pipe','pipe']
   });
   let socket:WebSocket|undefined;
+  let childOutput='';
+  child.stdout?.on('data',chunk=>{childOutput+=chunk.toString();});
+  child.stderr?.on('data',chunk=>{childOutput+=chunk.toString();});
   try{
     await waitForLog(child,new RegExp('Server running on port '+port));
     const health=await fetch('http://127.0.0.1:'+port+'/health');
@@ -61,7 +64,7 @@ test('production server smoke: health, readiness, MessagePack WebSocket and grac
     child.kill('SIGTERM');
     const [code,signal]=await once(child,'exit') as [number|null,NodeJS.Signals|null];
     assert.equal(signal,null);
-    assert.equal(code,0);
+    assert.equal(code,0,'Backend shutdown failed. Output: '+childOutput);
   }finally{
     if(socket&&socket.readyState!==WebSocket.CLOSED)socket.terminate();
     if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');
