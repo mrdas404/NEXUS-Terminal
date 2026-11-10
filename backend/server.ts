@@ -74,6 +74,7 @@ orderBookService.on('orderbook_update', (book) => {
 marketDataFeed.on('tick', tick => broadcast({ type: 'MARKET_TICK', data: tick }));
 marketDataFeed.on('candle', candle => broadcast({ type: 'MARKET_CANDLE', data: candle }));
 marketDataFeed.on('closed_candle', candle => broadcast({ type: 'MARKET_CANDLE_CLOSED', data: candle }));
+marketDataFeed.on('candle_gap', gap => broadcast({ type: 'MARKET_CANDLE_GAP', data: gap }));
 marketDataFeed.on('status', status => broadcast({ type: 'MARKET_FEED_STATUS', data: status }));
 
 // 5. Sentiment updates → broadcast binary
