@@ -56,6 +56,7 @@ const broadcast = (message: any) => {
   const payload = pack(message);
   for (const client of clients) {
     if (client.readyState === WebSocket.OPEN) {
+      if (client.bufferedAmount > 1 * 1024 * 1024) { client.terminate(); clients.delete(client); continue; }
       client.send(payload);
     }
   }
