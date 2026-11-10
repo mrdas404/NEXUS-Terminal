@@ -20,6 +20,6 @@ test('SQLite backup utility creates integrity-checked backups for both databases
     assert.equal(names.length,2);
     assert.ok(names.some(x=>x.startsWith('nexus-core-')));
     assert.ok(names.some(x=>x.startsWith('nexus-research-')));
-    for(const name of names){const db=new Database(path.join(backups,name),{readonly:true});assert.equal(db.pragma('quick_check')[0].quick_check,'ok');assert.equal(db.prepare('SELECT value FROM sample').get().value,'persisted');db.close();}
+    for(const name of names){const db=new Database(path.join(backups,name),{readonly:true});const integrity=db.pragma('quick_check') as Array<{quick_check:string}>;assert.equal(integrity[0]?.quick_check,'ok');const row=db.prepare('SELECT value FROM sample').get() as {value:string}|undefined;assert.equal(row?.value,'persisted');db.close();}
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
