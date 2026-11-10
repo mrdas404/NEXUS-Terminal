@@ -37,7 +37,8 @@ export function parseBinanceTradeMessage(raw: string, receivedAt = Date.now()): 
         !Number.isFinite(volume) || volume < 0 ||
         !Number.isSafeInteger(timestamp) || timestamp <= 0 ||
         timestamp > receivedAt + 30_000 || receivedAt - timestamp > 120_000) return null;
-    return { symbol, price, volume, timestamp, tradeId: payload.t ?? payload.a, marketType: 'LIVE', source: 'PROVIDER_API' };
+    const tradeId = payload.t ?? payload.a;
+    return { symbol, price, volume, timestamp, ...(tradeId === undefined ? {} : { tradeId }), marketType: 'LIVE', source: 'PROVIDER_API' };
   } catch {
     return null;
   }
