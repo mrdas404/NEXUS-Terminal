@@ -14,6 +14,7 @@ import { ResearchDashboard } from './components/ResearchDashboard';
 import { MarketFeedMonitor } from './components/MarketFeedMonitor';
 import { LiveCandleChart } from './components/LiveCandleChart';
 import { LivePaperFeedBridge } from './components/LivePaperFeedBridge';
+import { apiUrl } from './lib/api';
 
 function TerminalApp({ onLogout }: { onLogout: () => void }) {
   const { prices, signals, connected, history, pnl, orderBook, sentiment, marketFeed, marketTicks, marketCandles, closedMarketCandles } = useTerminalWebSocket();
@@ -116,14 +117,14 @@ function App() {
   const [check, setCheck] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    fetch('/api/auth/session', { credentials: 'same-origin', signal: controller.signal })
+    fetch(apiUrl('/api/auth/session'), { credentials: 'include', signal: controller.signal })
       .then(response => response.ok ? response.json() : { authenticated: false })
       .then(result => setAuth(result.authenticated ? 'authenticated' : 'anonymous'))
       .catch(() => { if (!controller.signal.aborted) setAuth('anonymous'); });
     return () => controller.abort();
   }, [check]);
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => undefined);
+    await fetch(apiUrl('/api/auth/logout'), { method: 'POST', credentials: 'include' }).catch(() => undefined);
     setAuth('anonymous');
   };
   if (auth === 'loading') return <div className="min-h-screen bg-darkBg text-gray-400 flex items-center justify-center">Checking administrator session…</div>;
