@@ -137,25 +137,8 @@ export function useTerminalWebSocket() {
   }, [recoverHistoricalCandles]);
 
   useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-    const symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT'];
-    Promise.all(symbols.map(async symbol => {
-      try {
-        const response = await fetch(`${API_URL}/api/market/candles?symbol=${encodeURIComponent(symbol)}&limit=300`, { signal: controller.signal });
-        if (!response.ok) throw new Error(`Historical candle API: HTTP ${response.status}`);
-        const result = await response.json();
-        if (result.marketType !== 'LIVE' || result.source !== 'PROVIDER_API' || result.timeframe !== '1m' || result.symbol !== symbol || !Array.isArray(result.candles)) return;
-        const candles = (result.candles as MarketCandle[]).filter(c => c.marketType === 'LIVE' && c.source === 'PROVIDER_API' && c.timeframe === '1m' && Number.isFinite(c.openTime) && Number.isFinite(c.closeTime) && c.closeTime < Date.now() && [c.open,c.high,c.low,c.close,c.volume].every(Number.isFinite) && c.low > 0 && c.volume >= 0 && c.high >= Math.max(c.open,c.close,c.low) && c.low <= Math.min(c.open,c.close,c.high)).sort((a,b)=>a.openTime-b.openTime).slice(-300);
-        if (!cancelled) setState(s => {
-          const live = s.marketCandles[symbol] || [];
-          const merged = [...candles, ...live].reduce((acc,c) => { acc.set(c.openTime,c); return acc; }, new Map<number,MarketCandle>());
-          return { ...s, marketCandles: { ...s.marketCandles, [symbol]: [...merged.values()].sort((a,b)=>a.openTime-b.openTime).slice(-300) } };
-        });
-      } catch (error) { if (!controller.signal.aborted) console.warn('[Market] Historical candle backfill failed:', error); }
-    }));
     const cleanup = connect();
-    return () => { cancelled = true; controller.abort(); cleanup(); };
+    return cleanup;
   }, [connect]);
 
   return state;
