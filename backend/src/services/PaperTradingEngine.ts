@@ -109,7 +109,7 @@ export class PaperTradingEngine {
           source: candle.source,
           signalTime: signal.timestamp,
           entryTime: candle.openTime,
-          expiryTime: this.history[Math.min(index + this.options.expiryCandles - 1, this.history.length - 1)].closeTime,
+          expiryTime: candle.closeTime + (this.options.expiryCandles - 1) * 60_000,
           entryPrice: candle.open,
           stake: this.options.stake,
           confirmations: signal.confirmations,
