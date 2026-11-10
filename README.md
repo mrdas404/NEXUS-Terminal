@@ -274,3 +274,13 @@ The optional paper bridge is deliberately manual: the user must create/recover a
 - The frontend loads history on startup and again after the market WebSocket reconnects, merging by candle open time so recent live candles take precedence.
 - The browser chart retains at most 300 candles per symbol. This is a bounded recent window, not a full archive.
 - No OTC, simulated, or Quotex quote is inferred from Binance data. Paper trading remains a separate explicit manual action.
+
+
+## Phase 5.5 — Persistent candle archive and offline recovery
+
+- Every successful Binance Spot REST history refresh is upserted into SQLite `research_candles`, keyed by symbol, market type, source, timeframe and candle open time.
+- Duplicate candles update the existing row; OHLCV and stream consistency are validated before a batch is written.
+- The chart's existing history endpoint merges the recent SQLite archive with newly fetched provider candles. If Binance is unavailable, it serves cached candles with `cacheUsed: true` and a provider error message; it never relabels the cache as a different source.
+- `GET /api/market/candles/archive` provides the persistent LIVE / PROVIDER_API archive with optional `startTime` and `endTime` Unix-millisecond filters.
+- This archive persists across browser refreshes and backend restarts when the configured SQLite file is persistent. It does not guarantee recovery of data from periods when the service was offline; no provider backfill pagination beyond the requested latest 300 candles is implemented.
+- OTC and SIMULATED streams remain separate; this chart archive endpoint is intentionally restricted to LIVE / PROVIDER_API.
