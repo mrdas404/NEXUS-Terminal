@@ -8,3 +8,7 @@ build/
 .next/
 .expo/
 .npm
+
+# Local deployment configuration and exported backups
+.env
+backups/
