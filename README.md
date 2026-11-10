@@ -258,3 +258,10 @@ The backend can connect to Binance's public Spot trade WebSocket for BTC/USDT, E
 The Market view now displays the public feed's connection state, provider, LIVE/PROVIDER_API provenance, last tick age, reconnect attempt and provider error. It shows the latest received BTC/USDT, ETH/USDT and SOL/USDT prices, and warns when the provider is stale, disconnected or the dashboard socket is offline.
 
 Configure `VITE_WS_URL` for the backend WebSocket when it is not at `ws://localhost:3001`. The Binance public spot stream is not Quotex OTC pricing. OTC is shown as unavailable rather than fabricated. Live feed ticks are informational only and are not automatically submitted to paper sessions or broker execution.
+
+
+## Phase 5.3 — Live candlestick chart and manual paper bridge
+
+The Market view now retains validated Binance LIVE / PROVIDER_API one-minute candles (up to 300 per symbol) and renders them in a candlestick chart. This is an in-memory browser-session window; it is not historical backfill and clears on refresh.
+
+The optional paper bridge is deliberately manual: the user must create/recover a virtual paper session, explicitly opt in, and press "Send one candle". It submits only the latest closed LIVE / PROVIDER_API 1m candle. There is no automatic feed forwarding and no broker order execution. The paper session is stream-locked by the backend; changing symbol/source within the same session is rejected by the paper engine. A fresh session is required for another stream.
