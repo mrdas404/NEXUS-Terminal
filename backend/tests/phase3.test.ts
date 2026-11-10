@@ -65,3 +65,16 @@ test('paper trading reset restores virtual balance and clears history', () => {
   assert.equal(engine.getSnapshot().balance, 250);
   assert.equal(engine.getSnapshot().trades.length, 0);
 });
+
+
+test('paper trade expiry time reflects the configured number of candles', () => {
+  const engine = new PaperTradingEngine(
+    { initialBalance: 100, stake: 10, payoutRate: 0.8, expiryCandles: 2 }, alwaysCall
+  );
+  engine.processCandle(candle(0, 100, 100));
+  const opened = engine.processCandle(candle(1, 101, 102));
+  assert.equal(opened.opened?.expiryTime, candle(2, 102, 104).closeTime);
+  assert.equal(opened.settled, undefined);
+  const settled = engine.processCandle(candle(2, 102, 104));
+  assert.equal(settled.settled?.status, 'WIN');
+});
