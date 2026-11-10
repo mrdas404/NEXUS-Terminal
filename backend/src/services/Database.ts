@@ -36,6 +36,12 @@ export class DatabaseService {
 
   // ── PnL ────────────────────────────────────────────────────────
 
+  public healthCheck(): boolean {
+    try { this.db.prepare('SELECT 1').get(); return true; } catch { return false; }
+  }
+
+  public close(): void { this.db.close(); }
+
   public getPersistedPnl(): number {
     const row = this.db.prepare('SELECT total_pnl FROM terminal_state WHERE id = 1').get() as any;
     return row ? row.total_pnl : 0.0;
