@@ -50,7 +50,7 @@ export class HistoricalCandleService {
       const values=[Number(openTime),Number(open),Number(high),Number(low),Number(close),Number(volume),Number(closeTime)];
       if(!values.every(Number.isFinite))continue;
       const [ot,o,h,l,c,v,ct]=values;
-      if(ot<=0||ct<=ot||ct>=now||o<=0||h<=0||l<=0||c<=0||v<0||h<Math.max(o,c,l)||l>Math.min(o,c,h))continue;
+      if(!Number.isSafeInteger(ot)||ot<=0||ot%60_000!==0||!Number.isSafeInteger(ct)||ct!==ot+59_999||ct>=now||o<=0||h<=0||l<=0||c<=0||v<0||h<Math.max(o,c,l)||l>Math.min(o,c,h))continue;
       candles.push({symbol,marketType:'LIVE',source:'PROVIDER_API',timeframe:'1m',openTime:ot,closeTime:ct,open:o,high:h,low:l,close:c,volume:v});
     }
     candles.sort((a,b)=>a.openTime-b.openTime);
