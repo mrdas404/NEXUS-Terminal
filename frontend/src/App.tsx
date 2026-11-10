@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { AdminLogin } from './components/AdminLogin';
 import { useTerminalWebSocket } from './hooks/useTerminalWebSocket';
 import { useNotifications } from './hooks/useNotifications';
 import { PriceTable } from './components/PriceTable';
@@ -14,7 +15,7 @@ import { MarketFeedMonitor } from './components/MarketFeedMonitor';
 import { LiveCandleChart } from './components/LiveCandleChart';
 import { LivePaperFeedBridge } from './components/LivePaperFeedBridge';
 
-function App() {
+function TerminalApp({ onLogout }: { onLogout: () => void }) {
   const { prices, signals, connected, history, pnl, orderBook, sentiment, marketFeed, marketTicks, marketCandles, closedMarketCandles } = useTerminalWebSocket();
   const { permission } = useNotifications(signals);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -56,6 +57,7 @@ function App() {
             <Settings2 size={18} />
             <span>CONFIG</span>
           </button>
+          <button onClick={onLogout} className="text-gray-400 hover:text-neonRed transition-colors">SIGN OUT</button>
 
           <div className="flex items-center gap-2">
             <Radio size={16} className={connected ? 'text-neonGreen animate-pulse' : 'text-neonRed'} />
@@ -108,4 +110,25 @@ function App() {
   );
 }
 
+
+function App() {
+  const [auth, setAuth] = useState<'loading' | 'authenticated' | 'anonymous'>('loading');
+  const [check, setCheck] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/auth/session', { credentials: 'same-origin', signal: controller.signal })
+      .then(response => response.ok ? response.json() : { authenticated: false })
+      .then(result => setAuth(result.authenticated ? 'authenticated' : 'anonymous'))
+      .catch(() => { if (!controller.signal.aborted) setAuth('anonymous'); });
+    return () => controller.abort();
+  }, [check]);
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => undefined);
+    setAuth('anonymous');
+  };
+  if (auth === 'loading') return <div className="min-h-screen bg-darkBg text-gray-400 flex items-center justify-center">Checking administrator session…</div>;
+  if (auth === 'anonymous') return <AdminLogin onAuthenticated={() => { setAuth('loading'); setCheck(value => value + 1); }} />;
+  return <TerminalApp onLogout={() => { void logout(); }} />;
+}
 export default App;
+
