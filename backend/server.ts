@@ -16,7 +16,7 @@ import type { Candle, MarketDataSource, QuotexMarketType } from './src/types';
 import { ResearchStore } from './src/services/ResearchStore';
 import { HistoricalResearchService } from './src/services/HistoricalResearchService';
 import { PersistentPaperTradingService } from './src/services/PersistentPaperTradingService';
-import type { PaperTradingOptions } from './src/services/PaperTradingEngine';
+import { PaperTradingEngine, type PaperTradingOptions } from './src/services/PaperTradingEngine';
 
 // Initialize exchanges
 import './src/exchanges/Binance';
@@ -152,10 +152,19 @@ app.post('/api/paper/sessions', (req, res) => {
     const sessionId = typeof req.body?.sessionId === 'string' ? req.body.sessionId.trim() : '';
     if (!sessionId || sessionId.length > 128) throw new Error('sessionId is required (max 128 characters)');
     if (req.body?.options && typeof req.body.options !== 'object') throw new Error('options must be an object');
-    const service = new PersistentPaperTradingService(sessionId, researchStore,
-      new (require('./src/services/PaperTradingEngine').PaperTradingEngine)(req.body?.options ?? {}));
+    const existing = researchStore.getPaperSession(sessionId);
+    const service = existing
+      ? new PersistentPaperTradingService(sessionId, researchStore)
+      : new PersistentPaperTradingService(sessionId, researchStore, new PaperTradingEngine(req.body?.options ?? {}));
+    if (existing && req.body?.options &&
+        JSON.stringify(req.body.options) !== JSON.stringify(service.getOptions())) {
+      throw new Error('Requested options do not match the existing paper session');
+    }
     paperSessions.set(sessionId, service);
-    res.status(201).json({ sessionId, recovered: researchStore.getPaperCandles(sessionId).length > 0, snapshot: service.getSnapshot() });
+    res.status(existing ? 200 : 201).json({
+      sessionId, recovered: Boolean(existing && researchStore.getPaperCandles(sessionId).length),
+      snapshot: service.getSnapshot()
+    });
   } catch (error) { apiError(res, error); }
 });
 app.get('/api/paper/sessions/:sessionId', (req, res) => {
