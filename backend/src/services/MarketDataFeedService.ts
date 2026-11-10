@@ -77,9 +77,15 @@ export class MarketDataFeedService extends EventEmitter {
     this.stopped = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     if (this.staleTimer) clearInterval(this.staleTimer);
-    this.socket?.removeAllListeners();
-    this.socket?.close();
+    const socket = this.socket;
     this.socket = null;
+    if (socket) {
+      socket.removeAllListeners();
+      // Closing during the WebSocket handshake can emit an asynchronous error.
+      // Keep a listener attached so shutdown cannot crash on that expected race.
+      socket.on('error', () => undefined);
+      socket.close();
+    }
     this.state = 'DISABLED';
     this.emit('status', this.getStatus());
   }
