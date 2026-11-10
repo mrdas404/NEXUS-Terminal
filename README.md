@@ -402,3 +402,37 @@ Dependency security:
 - A successful image build or unit-test workflow is not a clean dependency audit. Public deployment remains blocked until the current branch head has a fresh successful audit, all critical/high findings are resolved, and deployment has been reviewed.
 
 This is a single-admin gate, not multi-user identity management. It does not add account recovery, MFA, password rotation, persistent session revocation, or distributed rate limiting. Keep the service behind a private network or identity-aware ingress until those controls and production restore/monitoring checks are complete. No real-money trade execution is enabled.
+
+
+## Hybrid deployment — Vercel frontend + persistent Render backend
+
+This deployment profile keeps the React/Vite frontend on Vercel and runs the long-lived Node.js API/WebSocket process in a Docker web service with a persistent disk on Render. It is intended for read-only market analytics, historical research and virtual paper trading only.
+
+### 1. Deploy the backend on Render
+
+1. In Render, create a Blueprint from this repository and select branch `feature/quotex-edition`.
+2. Review `render.yaml`. It creates one Docker web service in Singapore, a 1 GB persistent disk at `/data`, and a `/ready` health check.
+3. Set `ADMIN_PASSWORD` to a unique password with at least 16 characters.
+4. Keep the generated `SESSION_SECRET` private (at least 32 characters).
+5. Set `CORS_ORIGINS` to the exact frontend origin(s), comma-separated, with no wildcard. After Vercel creates the project domain, add that exact origin here.
+6. Deploy and wait for the service health check to pass. Copy the HTTPS service URL.
+
+SQLite is intentionally configured for one backend instance because its database files live on the persistent disk. Do not scale this service horizontally. The Render disk must be mounted writable by the non-root container user; verify database initialization and restart recovery in the Render logs before using it. Backups must be copied off the service disk to independent storage before treating them as disaster recovery.
+
+### 2. Deploy the frontend on Vercel
+
+1. Import this repository in Vercel and select branch `feature/quotex-edition`.
+2. Set **Root Directory** to `frontend`.
+3. Use the Vite framework preset, build command `npm run build`, and output directory `dist` (also recorded in `frontend/vercel.json`).
+4. Add environment variable `VITE_API_URL` with the backend HTTPS origin, e.g. `https://YOUR-RENDER-SERVICE.onrender.com` (no trailing slash).
+5. Deploy the frontend. Copy its exact production origin and add it to Render's `CORS_ORIGINS`, then redeploy the backend if needed.
+
+The frontend derives its secure WebSocket URL from `VITE_API_URL` and uses the same backend origin for login, REST and WebSocket requests. An optional `VITE_WS_URL` can override the derived `wss://.../ws` URL.
+
+### 3. Cookie and domain requirements
+
+The admin session is an HttpOnly cookie. Cross-origin requests use credentials and the backend allows only explicitly configured origins. For the most reliable browser cookie behavior, use custom hostnames under the same registrable domain, for example `app.example.com` on Vercel and `api.example.com` on Render, and configure `VITE_API_URL=https://api.example.com`. Separate default Vercel and Render hostnames are cross-site; browser third-party-cookie restrictions may block the session cookie even when CORS is correct. Test login, page refresh, REST calls and WebSocket reconnect in the target browsers before production use.
+
+### 4. Production gate
+
+**Do not expose this deployment as a public production trading service yet.** The latest recorded dependency audit on branch head `6077365fb9a8f0c2e59a71d1876f715aa535011d` failed with critical/high findings in backend and frontend dependencies. Re-run the dependency audit against the final deployment commit and resolve all critical/high findings first. Also verify persistent-disk write access, backup/restore to off-host storage, session expiry, login throttling, HTTPS, CORS and WebSocket authentication. This application does not place real-money trades.
