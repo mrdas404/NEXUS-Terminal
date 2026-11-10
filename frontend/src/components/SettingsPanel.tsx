@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { X, Settings2, Save } from 'lucide-react';
 import type { TerminalSettings } from '../types';
+import { apiUrl } from '../lib/api';
 
 interface SettingsPanelProps {
   onClose: () => void;
 }
 
-const API_BASE = 'http://localhost:3001/api';
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
   const [settings, setSettings] = useState<TerminalSettings | null>(null);
@@ -14,7 +14,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_BASE}/settings`)
+    fetch(apiUrl('/api/settings'), { credentials: 'include' })
       .then(res => res.json())
       .then((data: TerminalSettings) => {
         setSettings(data);
@@ -30,9 +30,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
     if (!settings) return;
     setSaving(true);
     try {
-      await fetch(`${API_BASE}/settings`, {
+      await fetch(apiUrl('/api/settings'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(settings)
       });
       onClose(); // close on success
