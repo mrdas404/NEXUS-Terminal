@@ -1,4 +1,5 @@
 name: Dependency security audit
+# Re-runs on branch updates to keep the audit result aligned with the current branch head.
 
 on:
   workflow_dispatch:
