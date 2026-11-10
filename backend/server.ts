@@ -291,7 +291,9 @@ process.once('SIGINT', () => shutdown('SIGINT'));
 
 server.listen(Number(PORT), () => {
   marketDataFeed.start();
-  console.log(`[HTTP] Server running on port ${PORT}`);
-  console.log(`[WS]  Binary MessagePack WebSocket on port ${PORT}`);
+  const address = server.address();
+  const actualPort = typeof address === 'object' && address ? address.port : PORT;
+  console.log(`[HTTP] Server running on port ${actualPort}`);
+  console.log(`[WS]  Binary MessagePack WebSocket on port ${actualPort}`);
 });
 
