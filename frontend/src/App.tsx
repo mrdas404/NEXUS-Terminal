@@ -14,10 +14,11 @@ import { ResearchDashboard } from './components/ResearchDashboard';
 import { MarketFeedMonitor } from './components/MarketFeedMonitor';
 import { LiveCandleChart } from './components/LiveCandleChart';
 import { LivePaperFeedBridge } from './components/LivePaperFeedBridge';
+import { TechnicalSignalPanel } from './components/TechnicalSignalPanel';
 import { apiUrl } from './lib/api';
 
 function TerminalApp({ onLogout }: { onLogout: () => void }) {
-  const { prices, signals, connected, history, pnl, orderBook, sentiment, marketFeed, marketTicks, marketCandles, closedMarketCandles } = useTerminalWebSocket();
+  const { prices, signals, connected, history, pnl, orderBook, sentiment, marketFeed, marketTicks, marketCandles, closedMarketCandles, technicalSignals } = useTerminalWebSocket();
   const { permission } = useNotifications(signals);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [activeView, setActiveView] = useState<'terminal' | 'research'>('terminal');
@@ -76,6 +77,7 @@ function TerminalApp({ onLogout }: { onLogout: () => void }) {
         <MarketFeedMonitor status={marketFeed} ticks={marketTicks} connected={connected} />
         <LiveCandleChart candles={marketCandles} feedState={marketFeed.state} />
         <LivePaperFeedBridge candles={closedMarketCandles} />
+        <TechnicalSignalPanel signals={technicalSignals} />
 
         {/* Top Row: Mini Charts */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
