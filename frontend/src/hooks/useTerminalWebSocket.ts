@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { unpack } from 'msgpackr';
 import { apiUrl, apiOrigin } from '../lib/api';
 import type { Asset, ExchangeName, PriceUpdate, Signal, OrderBook, SentimentData } from '../types';
+import type { LiveTechnicalSignal } from '../types';
 
 export interface MarketFeedStatus {
   provider: string;
@@ -48,6 +49,7 @@ export interface TerminalState {
   marketCandles: Record<string, MarketCandle[]>;
   closedMarketCandles: MarketCandle[];
   marketGaps: MarketCandleGap[];
+  technicalSignals: LiveTechnicalSignal[];
 }
 
 const WS_URL = (import.meta.env.VITE_WS_URL || (apiOrigin ? apiOrigin.replace(/^http/, 'ws') + '/ws' : window.location.protocol.replace('http','ws') + '//' + window.location.host + '/ws')).replace(/^http/,'ws');
@@ -64,7 +66,7 @@ const MAX_HISTORY_POINTS = 60;
 export function useTerminalWebSocket() {
   const [state, setState] = useState<TerminalState>({
     prices: INITIAL_PRICES, signals: [], connected: false, history: INITIAL_HISTORY,
-    pnl: 0, orderBook: null, sentiment: null, marketFeed: INITIAL_FEED, marketTicks: [], marketCandles: {}, closedMarketCandles: [], marketGaps: []
+    pnl: 0, orderBook: null, sentiment: null, marketFeed: INITIAL_FEED, marketTicks: [], marketCandles: {}, closedMarketCandles: [], marketGaps: [], technicalSignals: []
   });
 
   const recoverHistoricalCandles = useCallback(async (signal?: AbortSignal) => {
@@ -97,7 +99,8 @@ export function useTerminalWebSocket() {
             ...s, prices: message.data.prices || INITIAL_PRICES,
             signals: message.data.signals || [], pnl: message.data.pnl || 0,
             sentiment: message.data.sentiment || null,
-            marketFeed: message.data.marketFeed || INITIAL_FEED
+            marketFeed: message.data.marketFeed || INITIAL_FEED,
+            technicalSignals: Array.isArray(message.data.technicalSignals) ? message.data.technicalSignals : s.technicalSignals
           }));
         } else if (message.type === 'MARKET_FEED_STATUS') {
           setState(s => ({ ...s, marketFeed: message.data as MarketFeedStatus }));
@@ -120,6 +123,10 @@ export function useTerminalWebSocket() {
             const closed = message.type === 'MARKET_CANDLE_CLOSED' ? [...s.closedMarketCandles.filter(item => !(item.symbol === candle.symbol && item.openTime === candle.openTime)), candle].sort((a,b)=>a.closeTime-b.closeTime).slice(-300) : s.closedMarketCandles;
             return { ...s, marketCandles: { ...s.marketCandles, [candle.symbol]: next }, closedMarketCandles: closed };
           });
+        } else if (message.type === 'TECHNICAL_SIGNAL_UPDATE') {
+          const signal = message.data as LiveTechnicalSignal;
+          if (!signal || !['CALL','PUT','WAIT'].includes(signal.direction) || signal.marketType !== 'LIVE' || signal.source !== 'PROVIDER_API' || signal.confidenceIsProbability !== false) return;
+          setState(s => ({ ...s, technicalSignals: [signal, ...s.technicalSignals.filter(item => item.id !== signal.id && item.symbol !== signal.symbol)].slice(0, 10) }));
         } else if (message.type === 'PNL_UPDATE') {
           setState(s => ({ ...s, pnl: message.data }));
         } else if (message.type === 'ORDERBOOK_UPDATE') {
