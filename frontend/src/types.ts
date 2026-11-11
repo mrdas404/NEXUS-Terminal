@@ -40,3 +40,25 @@ export interface SentimentData {
   headline: string;
   timestamp: number;
 }
+
+export interface LiveTechnicalSignal {
+  id: string;
+  direction: 'CALL' | 'PUT' | 'WAIT';
+  confidence: number;
+  confirmations: number;
+  totalChecks: number;
+  reasons: string[];
+  timestamp: number;
+  symbol: string;
+  marketType: 'LIVE';
+  source: 'PROVIDER_API';
+  indicators: {
+    rsi: number | null;
+    ema9: number | null; ema21: number | null; ema50: number | null;
+    macd: { macd: number; signal: number; histogram: number } | null;
+    bollinger: { upper: number; middle: number; lower: number } | null;
+    stochasticRsi: { k: number; d: number } | null;
+  };
+  confidenceIsProbability: false;
+  marketLabel: 'Binance Spot (not Quotex OTC)';
+}
