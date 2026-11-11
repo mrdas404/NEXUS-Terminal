@@ -20,6 +20,7 @@ import { PersistentPaperTradingService } from './src/services/PersistentPaperTra
 import { PaperTradingEngine, type PaperTradingOptions } from './src/services/PaperTradingEngine';
 import { MarketDataFeedService } from './src/services/MarketDataFeedService';
 import { HistoricalCandleService } from './src/services/HistoricalCandleService';
+import { LiveTechnicalSignalService } from './src/services/LiveTechnicalSignalService';
 
 // Initialize exchanges
 import './src/exchanges/Binance';
@@ -106,6 +107,7 @@ const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 1 * 1024 * 10
 const marketDataFeed = new MarketDataFeedService();
 const researchStore = new ResearchStore(process.env.RESEARCH_DB_PATH);
 const historicalCandles = new HistoricalCandleService(researchStore);
+const liveTechnicalSignals = new LiveTechnicalSignalService();
 
 let currentSignals: any[] = [];
 const clients: Set<WebSocket> = new Set();
@@ -155,7 +157,12 @@ orderBookService.on('orderbook_update', (book) => {
 // 4. Read-only public market feed → broadcast provenance-tagged ticks/candles
 marketDataFeed.on('tick', tick => broadcast({ type: 'MARKET_TICK', data: tick }));
 marketDataFeed.on('candle', candle => broadcast({ type: 'MARKET_CANDLE', data: candle }));
-marketDataFeed.on('closed_candle', candle => broadcast({ type: 'MARKET_CANDLE_CLOSED', data: candle }));
+marketDataFeed.on('closed_candle', candle => {
+  broadcast({ type: 'MARKET_CANDLE_CLOSED', data: candle });
+  const signal = liveTechnicalSignals.processClosedCandle(candle);
+  if (signal) broadcast({ type: 'TECHNICAL_SIGNAL_UPDATE', data: signal });
+});
+marketDataFeed.on('candle_gap', gap => liveTechnicalSignals.resetSymbol(gap.symbol));
 marketDataFeed.on('candle_gap', gap => broadcast({ type: 'MARKET_CANDLE_GAP', data: gap }));
 marketDataFeed.on('status', status => broadcast({ type: 'MARKET_FEED_STATUS', data: status }));
 
@@ -181,6 +188,7 @@ wss.on('connection', (ws) => {
       pnl: detectionEngine.totalPnl,
       sentiment: sentimentEngine.getSentiment(),
       marketFeed: marketDataFeed.getStatus(),
+      technicalSignals: liveTechnicalSignals.getLatest(),
     }
   }));
 
