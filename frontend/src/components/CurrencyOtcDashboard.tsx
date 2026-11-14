@@ -3,6 +3,13 @@ import { Activity, AlertTriangle, Clock3, Search, Signal, TrendingDown, Trending
 
 type Pair = { symbol: string; label: string; group: 'Major' | 'Minor' | 'Exotic' };
 const OTC_CURRENCY_PAIRS: Pair[] = [
+  ...['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CAD','EUR/JPY','GBP/JPY','USD/CHF','NZD/USD','EUR/GBP','AUD/JPY','EUR/AUD','AUD/CAD','EUR/CHF','GBP/AUD','CAD/JPY','CHF/JPY','EUR/CAD','GBP/CHF','NZD/JPY','GBP/CAD','AUD/CHF','AUD/NZD','EUR/NZD'].map(symbol=>({symbol,label:symbol+' (OTC)',group:'Major' as const})),
+  ...['USD/INR','USD/BRL','USD/TRY','USD/MXN','USD/ZAR','GBP/NZD','CAD/CHF','NZD/CAD','NZD/CHF','USD/PKR','USD/BDT','USD/IDR','USD/PHP','USD/EGP','USD/ARS','USD/COP','EUR/SGD','USD/DZD','USD/NGN'].map(symbol=>({symbol,label:symbol+' (OTC)',group:'Exotic' as const}))
+];port { useMemo, useState } from 'react';
+import { Activity, AlertTriangle, Clock3, Search, Signal, TrendingDown, TrendingUp } from 'lucide-react';
+
+type Pair = { symbol: string; label: string; group: 'Major' | 'Minor' | 'Exotic' };
+const OTC_CURRENCY_PAIRS: Pair[] = [
   ...['EUR/USD','GBP/USD','USD/JPY','AUD/USD','USD/CAD','USD/CHF','NZD/USD'].map(symbol=>({symbol,label:symbol+' (OTC)',group:'Major' as const})),
   ...['EUR/GBP','EUR/JPY','GBP/JPY','AUD/JPY','EUR/AUD','GBP/AUD','EUR/CAD','GBP/CAD','AUD/CAD','CHF/JPY','EUR/CHF','GBP/CHF','NZD/JPY','AUD/NZD','EUR/NZD','GBP/NZD','NZD/CAD','CAD/JPY','CAD/CHF','NZD/CHF','AUD/CHF'].map(symbol=>({symbol,label:symbol+' (OTC)',group:'Minor' as const})),
   ...['USD/BDT','USD/TRY','USD/MXN','USD/ZAR','USD/PLN','USD/NOK','USD/SEK','USD/DKK','USD/SGD','USD/HKD','USD/PKR','USD/COP','ARS/USD','BRL/USD','INR/USD','DZD/USD','EUR/SGD'].map(symbol=>({symbol,label:symbol+' (OTC)',group:'Exotic' as const}))
