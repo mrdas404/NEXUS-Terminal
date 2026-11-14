@@ -49,6 +49,9 @@ test('Bollinger bands are centered on the period mean', () => {
 
 test('MACD and Stochastic RSI wait for sufficient history', () => {
   assert.equal(calculateMacd(Array(30).fill(100)), null);
+  const flatMacd = calculateMacd(Array(40).fill(100));
+  assert.ok(flatMacd);
+  assert.equal(flatMacd.histogram, 0);
   assert.equal(calculateStochasticRsi(Array(20).fill(100)), null);
   const values = Array.from({ length: 100 }, (_, i) => 100 + Math.sin(i / 3) * 4 + i * 0.05);
   assert.ok(calculateMacd(values));
