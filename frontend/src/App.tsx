@@ -16,8 +16,14 @@ import { LiveCandleChart } from './components/LiveCandleChart';
 import { LivePaperFeedBridge } from './components/LivePaperFeedBridge';
 import { TechnicalSignalPanel } from './components/TechnicalSignalPanel';
 import { apiUrl } from './lib/api';
+import { CurrencyOtcDashboard } from './components/CurrencyOtcDashboard';
 
 function TerminalApp({ onLogout }: { onLogout: () => void }) {
+  return <CurrencyOtcDashboard />;
+}
+
+/* Legacy crypto terminal retained temporarily for reference during migration.
+function LegacyTerminalApp({ onLogout }: { onLogout: () => void }) {
   const { prices, signals, connected, history, pnl, orderBook, sentiment, marketFeed, marketTicks, marketCandles, closedMarketCandles, technicalSignals } = useTerminalWebSocket();
   const { permission } = useNotifications(signals);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -113,6 +119,7 @@ function TerminalApp({ onLogout }: { onLogout: () => void }) {
   );
 }
 
+*/
 
 function App() {
   const [auth, setAuth] = useState<'loading' | 'authenticated' | 'anonymous'>('loading');
